@@ -13,6 +13,11 @@ class ARScene {
         this.initialCubeScale = 1;
         this.pinchStartDistance = 0;
         
+        // Stato rotazione
+        this.isRotating = false;
+        this.lastRotationPosition = new THREE.Vector2();
+        this.rotationSensitivity = 3.0;
+        
         // Configurazione cubo
         this.cubeConfig = {
             size: 0.2,
@@ -171,16 +176,19 @@ class ARScene {
         
         if (!handResults.gestures || handResults.gestures.length === 0) {
             this.releaseGrab();
+            this.stopRotation();
             return;
         }
         
-        // Trova gesti di grab e pinch
+        // Trova gesti di grab, pinch e open
         const grabGestures = handResults.gestures.filter(g => g.type === 'grab');
         const pinchGestures = handResults.gestures.filter(g => g.type === 'pinch');
+        const openGestures = handResults.gestures.filter(g => g.type === 'open');
         
         // Gestisci grab (movimento cubo)
         if (grabGestures.length > 0) {
             this.handleGrabGesture(grabGestures[0], handResults);
+            this.stopRotation(); // Stop rotation when grabbing
         } else {
             this.releaseGrab();
         }
@@ -188,6 +196,14 @@ class ARScene {
         // Gestisci pinch (scala cubo)
         if (pinchGestures.length > 0) {
             this.handlePinchGesture(pinchGestures, handResults);
+            this.stopRotation(); // Stop rotation when pinching
+        }
+        
+        // Gestisci rotazione con mano aperta (quando non si afferra o pizzica)
+        if (openGestures.length > 0 && !this.isGrabbing && pinchGestures.length === 0) {
+            this.handleRotationGesture(openGestures[0]);
+        } else if (!this.isGrabbing && pinchGestures.length === 0) {
+            this.stopRotation();
         }
     }
     
@@ -237,8 +253,10 @@ class ARScene {
             this.isGrabbing = false;
             this.grabbingHand = null;
             
-            // Rimuovi feedback visivo
-            this.cube.material.emissive.setHex(0x000000);
+            // Rimuovi feedback visivo se non si sta ruotando
+            if (!this.isRotating) {
+                this.cube.material.emissive.setHex(0x000000);
+            }
             
             console.log('Grab rilasciato');
         }
@@ -268,9 +286,48 @@ class ARScene {
         } else {
             // Reset pinch
             this.pinchStartDistance = 0;
+            if (!this.isGrabbing && !this.isRotating) {
+                this.cube.material.emissive.setHex(0x000000);
+            }
+        }
+    }
+    
+    handleRotationGesture(openGesture) {
+        const currentPos = new THREE.Vector2(openGesture.position.x, openGesture.position.y);
+        
+        if (!this.isRotating) {
+            // Inizia rotazione
+            this.isRotating = true;
+            this.lastRotationPosition.copy(currentPos);
+            
+            // Feedback visivo per rotazione
+            this.cube.material.emissive.setHex(0x003300);
+            
+            console.log('Rotazione iniziata');
+        } else {
+            // Continua rotazione
+            const deltaX = (currentPos.x - this.lastRotationPosition.x) * this.rotationSensitivity;
+            const deltaY = (currentPos.y - this.lastRotationPosition.y) * this.rotationSensitivity;
+            
+            // Applica rotazione al cubo
+            this.cube.rotation.y += deltaX;
+            this.cube.rotation.x += deltaY;
+            
+            // Aggiorna posizione precedente
+            this.lastRotationPosition.copy(currentPos);
+        }
+    }
+    
+    stopRotation() {
+        if (this.isRotating) {
+            this.isRotating = false;
+            
+            // Rimuovi feedback visivo se non ci sono altre interazioni
             if (!this.isGrabbing) {
                 this.cube.material.emissive.setHex(0x000000);
             }
+            
+            console.log('Rotazione fermata');
         }
     }
     

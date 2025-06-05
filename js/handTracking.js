@@ -6,12 +6,16 @@ class HandTracker {
         this.isInitialized = false;
         this.isRunning = false;
         
+        // Canvas per disegnare landmarks delle mani
+        this.canvasElement = null;
+        this.canvasCtx = null;
+        
         // Configurazione per performance mobile
         this.config = {
             maxNumHands: 2,
             modelComplexity: 0, // 0 = lite, 1 = full
-            minDetectionConfidence: 0.7,
-            minTrackingConfidence: 0.5
+            minDetectionConfidence: 0.6, // Ridotto per mobile
+            minTrackingConfidence: 0.4   // Ridotto per mobile
         };
         
         // Stato delle mani per gesture recognition
@@ -30,6 +34,9 @@ class HandTracker {
     
     async init() {
         try {
+            // Inizializza canvas per landmarks
+            this.initCanvas();
+            
             // Inizializza MediaPipe Hands
             this.hands = new Hands({
                 locateFile: (file) => {
@@ -54,21 +61,53 @@ class HandTracker {
         }
     }
     
+    initCanvas() {
+        // Crea canvas overlay per disegnare landmarks
+        this.canvasElement = document.createElement('canvas');
+        this.canvasElement.id = 'hand-landmarks';
+        this.canvasElement.style.position = 'absolute';
+        this.canvasElement.style.top = '0';
+        this.canvasElement.style.left = '0';
+        this.canvasElement.style.width = '100%';
+        this.canvasElement.style.height = '100%';
+        this.canvasElement.style.pointerEvents = 'none';
+        this.canvasElement.style.zIndex = '10';
+        
+        document.getElementById('container').appendChild(this.canvasElement);
+        this.canvasCtx = this.canvasElement.getContext('2d');
+        
+        // Ridimensiona canvas
+        this.resizeCanvas();
+        window.addEventListener('resize', () => this.resizeCanvas());
+    }
+    
+    resizeCanvas() {
+        this.canvasElement.width = window.innerWidth;
+        this.canvasElement.height = window.innerHeight;
+    }
+    
     async start() {
         if (!this.isInitialized) {
             throw new Error('HandTracker non inizializzato');
         }
         
         try {
-            // Inizializza camera
-            this.camera = new Camera(document.getElementById('video'), {
+            // Configurazione camera ottimizzata per mobile
+            const videoElement = document.getElementById('video');
+            
+            // Inizializza camera con fallback per mobile
+            this.camera = new Camera(videoElement, {
                 onFrame: async () => {
-                    if (this.isRunning) {
-                        await this.hands.send({ image: document.getElementById('video') });
+                    if (this.isRunning && this.hands) {
+                        try {
+                            await this.hands.send({ image: videoElement });
+                        } catch (error) {
+                            console.warn('Errore invio frame:', error);
+                        }
                     }
                 },
-                width: 1280,
-                height: 720
+                width: window.innerWidth > 768 ? 1280 : 640,  // Risoluzione adattiva
+                height: window.innerWidth > 768 ? 720 : 480
             });
             
             await this.camera.start();
@@ -90,6 +129,12 @@ class HandTracker {
     }
     
     processResults(results) {
+        // Pulisci canvas
+        this.clearCanvas();
+        
+        // Disegna landmarks delle mani
+        this.drawHandLandmarks(results);
+        
         // Aggiorna stati delle mani
         this.updateHandStates(results);
         
@@ -101,6 +146,103 @@ class HandTracker {
                 gestures: this.detectGestures(results)
             });
         }
+    }
+    
+    clearCanvas() {
+        if (this.canvasCtx) {
+            this.canvasCtx.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
+        }
+    }
+    
+    drawHandLandmarks(results) {
+        if (!this.canvasCtx || !results.multiHandLandmarks) return;
+        
+        const ctx = this.canvasCtx;
+        const width = this.canvasElement.width;
+        const height = this.canvasElement.height;
+        
+        // Disegna ogni mano rilevata
+        for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+            const landmarks = results.multiHandLandmarks[i];
+            const handedness = results.multiHandedness[i];
+            const isLeft = handedness.label === 'Left';
+            
+            // Colore diverso per mano sinistra e destra
+            const handColor = isLeft ? '#00ff00' : '#ff0000';
+            const jointColor = isLeft ? '#00aa00' : '#aa0000';
+            
+            // Disegna connessioni tra landmarks
+            this.drawHandConnections(ctx, landmarks, width, height, handColor);
+            
+            // Disegna landmarks (punti delle dita)
+            this.drawHandPoints(ctx, landmarks, width, height, jointColor);
+            
+            // Disegna etichetta mano
+            this.drawHandLabel(ctx, landmarks, width, height, handedness.label, handColor);
+        }
+    }
+    
+    drawHandConnections(ctx, landmarks, width, height, color) {
+        // Connessioni delle dita
+        const connections = [
+            // Pollice
+            [0, 1], [1, 2], [2, 3], [3, 4],
+            // Indice
+            [0, 5], [5, 6], [6, 7], [7, 8],
+            // Medio
+            [0, 9], [9, 10], [10, 11], [11, 12],
+            // Anulare
+            [0, 13], [13, 14], [14, 15], [15, 16],
+            // Mignolo
+            [0, 17], [17, 18], [18, 19], [19, 20],
+            // Palmo
+            [5, 9], [9, 13], [13, 17]
+        ];
+        
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        
+        connections.forEach(([start, end]) => {
+            const startPoint = landmarks[start];
+            const endPoint = landmarks[end];
+            
+            ctx.beginPath();
+            ctx.moveTo(startPoint.x * width, startPoint.y * height);
+            ctx.lineTo(endPoint.x * width, endPoint.y * height);
+            ctx.stroke();
+        });
+    }
+    
+    drawHandPoints(ctx, landmarks, width, height, color) {
+        ctx.fillStyle = color;
+        
+        landmarks.forEach((landmark, index) => {
+            const x = landmark.x * width;
+            const y = landmark.y * height;
+            
+            // Dimensione diversa per punti importanti
+            const radius = [0, 4, 8, 12, 16, 20].includes(index) ? 6 : 4;
+            
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Bordo bianco per visibilità
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        });
+    }
+    
+    drawHandLabel(ctx, landmarks, width, height, label, color) {
+        const wrist = landmarks[0];
+        const x = wrist.x * width;
+        const y = wrist.y * height - 20;
+        
+        ctx.fillStyle = color;
+        ctx.font = '16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(label, x, y);
     }
     
     updateHandStates(results) {

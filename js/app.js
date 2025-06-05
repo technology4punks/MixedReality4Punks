@@ -74,6 +74,9 @@ class ARCardboardApp {
         this.handTracker = new HandTracker();
         await this.handTracker.init();
         
+        // Inizializza canvas per avatar delle dita
+        this.handTracker.initCanvas();
+        
         this.handTracker.onResults = (results) => {
             this.onHandResults(results);
         };
@@ -137,18 +140,58 @@ class ARCardboardApp {
     
     async requestCameraPermission() {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({
+            // Configurazioni camera con fallback per mobile
+            const constraints = {
                 video: {
-                    facingMode: 'environment',
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
+                    facingMode: { ideal: 'environment' },
+                    width: { 
+                        ideal: window.innerWidth > 768 ? 1280 : 640,
+                        max: 1920
+                    },
+                    height: { 
+                        ideal: window.innerWidth > 768 ? 720 : 480,
+                        max: 1080
+                    },
+                    frameRate: { ideal: 30, max: 60 }
                 }
-            });
+            };
+            
+            let stream;
+            try {
+                // Prova prima con camera posteriore
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+            } catch (error) {
+                console.warn('Camera posteriore non disponibile, provo con quella anteriore:', error);
+                // Fallback a camera anteriore
+                constraints.video.facingMode = 'user';
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+            }
             
             this.elements.video.srcObject = stream;
-            return stream;
+            
+            // Attendi che il video sia pronto
+            return new Promise((resolve, reject) => {
+                this.elements.video.onloadedmetadata = () => {
+                    this.elements.video.play()
+                        .then(() => {
+                            console.log('Video stream attivo:', stream.getVideoTracks()[0].getSettings());
+                            resolve(stream);
+                        })
+                        .catch(reject);
+                };
+                
+                this.elements.video.onerror = () => {
+                    reject(new Error('Errore caricamento video'));
+                };
+                
+                // Timeout di sicurezza
+                setTimeout(() => {
+                    reject(new Error('Timeout caricamento video'));
+                }, 10000);
+            });
             
         } catch (error) {
+            console.error('Errore accesso camera:', error);
             throw new Error('Impossibile accedere alla camera: ' + error.message);
         }
     }
