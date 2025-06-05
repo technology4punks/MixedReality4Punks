@@ -2,8 +2,12 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR Cardboard - Mixed Reality Experience</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="msapplication-tap-highlight" content="no">
+    <title>AR Hand Tracking</title>
     <style>
         body {
             margin: 0;
@@ -21,9 +25,25 @@
         }
         
         #canvas {
-            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
+            z-index: 1;
+            -webkit-transform: translateZ(0);
+            transform: translateZ(0);
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+        }
+        
+        /* Specifico per Safari */
+        @supports (-webkit-appearance: none) {
+            #canvas {
+                -webkit-transform: translate3d(0, 0, 0);
+                transform: translate3d(0, 0, 0);
+                will-change: transform;
+            }
         }
         
         #ui {
@@ -57,6 +77,12 @@
             font-size: 16px;
             cursor: pointer;
             touch-action: manipulation;
+            -webkit-appearance: none;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+            position: relative;
+            z-index: 1000;
         }
         
         .btn:hover {

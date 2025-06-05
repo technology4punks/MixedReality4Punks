@@ -69,22 +69,58 @@ class ARCardboardApp {
     }
     
     async initRenderer() {
-        // Inizializza Three.js renderer
-        this.renderer = new THREE.WebGLRenderer({
+        // Configurazioni specifiche per Safari
+        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        
+        const rendererConfig = {
             canvas: this.elements.canvas,
-            antialias: true,
-            alpha: true
-        });
+            antialias: !isSafari, // Disabilita antialiasing su Safari per performance
+            alpha: true,
+            powerPreference: isSafari ? 'default' : 'high-performance',
+            preserveDrawingBuffer: isSafari, // Necessario per Safari
+            premultipliedAlpha: false
+        };
+        
+        // Configurazioni aggiuntive per iOS
+        if (isIOS) {
+            rendererConfig.precision = 'mediump';
+            rendererConfig.stencil = false;
+        }
+        
+        this.renderer = new THREE.WebGLRenderer(rendererConfig);
         
         this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        
+        // PixelRatio più conservativo per Safari
+        const pixelRatio = isSafari ? 1 : Math.min(window.devicePixelRatio, 2);
+        this.renderer.setPixelRatio(pixelRatio);
+        
         this.renderer.xr.enabled = true;
-        this.renderer.shadowMap.enabled = true;
-        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        
+        // Ombre più conservative per Safari
+        if (isSafari) {
+            this.renderer.shadowMap.enabled = false; // Disabilita ombre su Safari
+        } else {
+            this.renderer.shadowMap.enabled = true;
+            this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        }
+        
+        // Configurazioni di rendering conservative per Safari
+        if (isSafari) {
+            this.renderer.outputEncoding = THREE.LinearEncoding;
+            this.renderer.toneMapping = THREE.NoToneMapping;
+        } else {
+            this.renderer.outputEncoding = THREE.sRGBEncoding;
+            this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            this.renderer.toneMappingExposure = 1.0;
+        }
         
         // Configura per performance mobile
-        this.renderer.powerPreference = 'high-performance';
+        this.renderer.powerPreference = isSafari ? 'default' : 'high-performance';
         this.renderer.precision = 'mediump';
+        
+        console.log('Renderer inizializzato per', isSafari ? 'Safari' : 'browser standard');
     }
     
     async initHandTracking() {
@@ -113,6 +149,31 @@ class ARCardboardApp {
     }
     
     setupEventListeners() {
+        // Gestione eventi con supporto touch per Safari/iOS
+        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        
+        if (isSafari || isIOS) {
+            // Per Safari/iOS, usa eventi touch per migliore responsività
+            this.elements.startBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                this.startAR();
+            });
+            this.elements.cardboardBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                this.toggleCardboard();
+            });
+            this.elements.resetBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                this.resetScene();
+            });
+            this.elements.debugBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                this.toggleDebug();
+            });
+        }
+        
+        // Eventi click standard per tutti i browser
         this.elements.startBtn.addEventListener('click', () => this.startAR());
         this.elements.cardboardBtn.addEventListener('click', () => this.toggleCardboard());
         this.elements.resetBtn.addEventListener('click', () => this.resetScene());
@@ -136,6 +197,24 @@ class ARCardboardApp {
         this.updateStatus('Avvio AR...');
         
         try {
+            // Controllo specifico per Safari
+            const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+            
+            if (isSafari || isIOS) {
+                this.updateStatus('Safari rilevato - Applicando configurazioni specifiche...');
+                console.warn('Safari/iOS rilevato - Prestazioni potrebbero essere limitate');
+                
+                // Avviso specifico per Safari
+                if (confirm('Safari rilevato!\n\nPer migliori prestazioni:\n1. Assicurati di avere Safari aggiornato\n2. Chiudi altre schede/app\n3. Considera Chrome se disponibile\n\nContinuare comunque?')) {
+                    console.log('Utente ha confermato di continuare con Safari');
+                } else {
+                    this.elements.startBtn.disabled = false;
+                    this.updateStatus('Avvio annullato dall\'utente');
+                    return;
+                }
+            }
+            
             // Verifica supporto dispositivo
             this.checkDeviceSupport();
             
@@ -181,6 +260,32 @@ class ARCardboardApp {
             throw new Error('WebAssembly non supportato - necessario per hand tracking');
         }
         
+        // Controlli specifici per Safari
+        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+        if (isSafari) {
+            console.warn('Safari rilevato - applicando workaround specifici');
+            
+            // Verifica supporto WebRTC su Safari
+            if (!window.RTCPeerConnection) {
+                throw new Error('WebRTC non supportato su questa versione di Safari');
+            }
+            
+            // Verifica versione iOS Safari
+            const iosVersion = this.getIOSVersion();
+            if (iosVersion && iosVersion < 14) {
+                throw new Error('iOS 14+ richiesto per questa applicazione');
+            }
+        }
+    }
+    
+    getIOSVersion() {
+        const match = navigator.userAgent.match(/OS (\d+)_(\d+)_?(\d+)?/);
+        if (match) {
+            return parseInt(match[1], 10);
+        }
+        return null;
+    }
+        
         console.log('Verifiche supporto dispositivo completate');
     }
     
@@ -195,77 +300,153 @@ class ARCardboardApp {
     }
     
     getDetailedErrorMessage(error) {
+        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        
         if (error.name === 'NotAllowedError') {
+            if (isSafari || isIOS) {
+                return 'Permesso camera negato su Safari. Assicurati di:\n1. Permettere accesso camera quando richiesto\n2. Verificare impostazioni privacy Safari\n3. Provare in modalità privata';
+            }
             return 'Permesso camera negato. Abilita la camera nelle impostazioni del browser.';
         }
         if (error.name === 'NotFoundError') {
+            if (isSafari || isIOS) {
+                return 'Camera non trovata su Safari. Verifica:\n1. Che il dispositivo abbia una camera\n2. Che Safari abbia accesso alla camera\n3. Riavvia Safari se necessario';
+            }
             return 'Nessuna camera trovata su questo dispositivo.';
         }
         if (error.name === 'NotSupportedError') {
+            if (isSafari || isIOS) {
+                return 'Camera non supportata su questa versione Safari. Aggiorna Safari o prova Chrome.';
+            }
             return 'Camera non supportata su questo dispositivo.';
         }
         if (error.name === 'NotReadableError') {
+            if (isSafari || isIOS) {
+                return 'Camera occupata su Safari. Chiudi altre app/schede che usano la camera e riprova.';
+            }
             return 'Camera in uso da altra applicazione.';
         }
         if (error.message.includes('WebGL')) {
+            if (isSafari || isIOS) {
+                return 'WebGL limitato su Safari. Prova:\n1. Abilitare WebGL nelle impostazioni Safari\n2. Usare Chrome o Firefox se disponibili\n3. Aggiornare iOS/Safari';
+            }
             return 'WebGL non supportato. Prova con un browser più recente.';
         }
         if (error.message.includes('MediaPipe') || error.message.includes('WASM')) {
+            if (isSafari || isIOS) {
+                return 'Hand tracking limitato su Safari. Aggiorna Safari o prova Chrome per prestazioni migliori.';
+            }
             return 'Hand tracking non supportato su questo dispositivo.';
         }
+        
+        if (isSafari || isIOS) {
+            return `Errore Safari: ${error.message}\n\nSuggerimenti:\n1. Aggiorna Safari all'ultima versione\n2. Prova in modalità privata\n3. Usa Chrome se disponibile`;
+        }
+        
         return error.message;
     }
     
     async requestCameraPermission() {
         try {
-            // Configurazioni camera con fallback per mobile
-            const constraints = {
+            console.log('Richiesta accesso camera...');
+            
+            // Rileva browser e dispositivo
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+            
+            // Configurazioni specifiche per Safari/iOS
+            let constraints = {
                 video: {
-                    facingMode: { ideal: 'environment' },
-                    width: { 
-                        ideal: window.innerWidth > 768 ? 1280 : 640,
-                        max: 1920
-                    },
-                    height: { 
-                        ideal: window.innerWidth > 768 ? 720 : 480,
-                        max: 1080
-                    },
-                    frameRate: { ideal: 30, max: 60 }
-                }
+                    width: { ideal: isMobile ? (isSafari ? 480 : 640) : 1280 },
+                    height: { ideal: isMobile ? (isSafari ? 360 : 480) : 720 },
+                    frameRate: { ideal: isSafari ? 10 : (isMobile ? 15 : 30) },
+                    facingMode: 'environment'
+                },
+                audio: false
             };
+            
+            // Configurazioni aggiuntive per Safari
+            if (isSafari) {
+                constraints.video.aspectRatio = 4/3;
+                constraints.video.resizeMode = 'crop-and-scale';
+                
+                // Su iOS Safari, usa configurazioni più conservative
+                if (isIOS) {
+                    constraints.video.width = { ideal: 320, max: 640 };
+                    constraints.video.height = { ideal: 240, max: 480 };
+                    constraints.video.frameRate = { ideal: 8, max: 15 };
+                }
+            }
             
             let stream;
             try {
-                // Prova prima con camera posteriore
+                // Prova prima con camera environment
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
-            } catch (error) {
-                console.warn('Camera posteriore non disponibile, provo con quella anteriore:', error);
-                // Fallback a camera anteriore
+                console.log('Camera environment ottenuta');
+            } catch (envError) {
+                console.warn('Camera environment non disponibile, provo user camera:', envError.message);
+                // Fallback a camera frontale
                 constraints.video.facingMode = 'user';
-                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    console.log('Camera user ottenuta');
+                } catch (userError) {
+                    // Ultimo tentativo con configurazioni minime
+                    console.warn('Provo configurazioni minime:', userError.message);
+                    constraints = {
+                        video: {
+                            width: { ideal: 320 },
+                            height: { ideal: 240 },
+                            frameRate: { ideal: 8 }
+                        },
+                        audio: false
+                    };
+                    stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    console.log('Camera con configurazioni minime ottenuta');
+                }
             }
             
             this.elements.video.srcObject = stream;
             
-            // Attendi che il video sia pronto
+            // Configurazioni specifiche per Safari
+            if (isSafari) {
+                this.elements.video.setAttribute('playsinline', 'true');
+                this.elements.video.setAttribute('webkit-playsinline', 'true');
+                this.elements.video.muted = true;
+            }
+            
+            // Aspetta che il video sia pronto
             return new Promise((resolve, reject) => {
                 this.elements.video.onloadedmetadata = () => {
-                    this.elements.video.play()
-                        .then(() => {
-                            console.log('Video stream attivo:', stream.getVideoTracks()[0].getSettings());
-                            resolve(stream);
-                        })
-                        .catch(reject);
+                    // Per Safari, aggiungi un piccolo delay
+                    const playVideo = () => {
+                        this.elements.video.play()
+                            .then(() => {
+                                console.log('Video stream attivo:', stream.getVideoTracks()[0].getSettings());
+                                resolve(stream);
+                            })
+                            .catch(reject);
+                    };
+                    
+                    if (isSafari) {
+                        setTimeout(playVideo, 100);
+                    } else {
+                        playVideo();
+                    }
                 };
                 
                 this.elements.video.onerror = () => {
                     reject(new Error('Errore caricamento video'));
                 };
                 
-                // Timeout di sicurezza
+                // Timeout più lungo per Safari
+                const timeout = isSafari ? 15000 : 10000;
                 setTimeout(() => {
                     reject(new Error('Timeout caricamento video'));
-                }, 10000);
+                }, timeout);
             });
             
         } catch (error) {
