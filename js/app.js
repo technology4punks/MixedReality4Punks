@@ -13,16 +13,33 @@ class ARCardboardApp {
         this.lastTime = performance.now();
         
         this.elements = {
-            loading: document.getElementById('loading'),
-            status: document.getElementById('status'),
-            handsCount: document.getElementById('handsCount'),
-            fps: document.getElementById('fps'),
+            video: document.getElementById('video'),
+            canvas: document.getElementById('canvas'),
             startBtn: document.getElementById('startBtn'),
             cardboardBtn: document.getElementById('cardboardBtn'),
             resetBtn: document.getElementById('resetBtn'),
-            canvas: document.getElementById('canvas'),
-            video: document.getElementById('video')
+            debugBtn: document.getElementById('debugBtn'),
+            status: document.getElementById('status'),
+            gestureCount: document.getElementById('gesture-count'),
+            leftHand: document.getElementById('left-hand'),
+            rightHand: document.getElementById('right-hand'),
+            cubeState: document.getElementById('cube-state'),
+            debugInfo: document.getElementById('debug-info'),
+            deviceInfo: document.getElementById('device-info'),
+            cameraInfo: document.getElementById('camera-info'),
+            webglInfo: document.getElementById('webgl-info'),
+            trackingInfo: document.getElementById('tracking-info'),
+            distanceInfo: document.getElementById('distance-info'),
+            scaleInfo: document.getElementById('scale-info'),
+            fpsInfo: document.getElementById('fps-info'),
+            collisionIndicator: document.getElementById('collision-indicator')
         };
+        
+        // Debug state
+        this.debugMode = false;
+        this.lastFrameTime = 0;
+        this.frameCount = 0;
+        this.fps = 0;
         
         this.init();
     }
@@ -99,6 +116,7 @@ class ARCardboardApp {
         this.elements.startBtn.addEventListener('click', () => this.startAR());
         this.elements.cardboardBtn.addEventListener('click', () => this.toggleCardboard());
         this.elements.resetBtn.addEventListener('click', () => this.resetScene());
+        this.elements.debugBtn.addEventListener('click', () => this.toggleDebug());
         
         window.addEventListener('resize', () => this.onWindowResize());
         
@@ -114,28 +132,88 @@ class ARCardboardApp {
     }
     
     async startAR() {
+        this.elements.startBtn.disabled = true;
+        this.updateStatus('Avvio AR...');
+        
         try {
-            this.updateStatus('Avvio AR...');
-            this.elements.startBtn.disabled = true;
+            // Verifica supporto dispositivo
+            this.checkDeviceSupport();
             
+            this.updateStatus('Richiesta permessi camera...');
             // Richiedi permessi camera
             await this.requestCameraPermission();
             
+            this.updateStatus('Inizializzazione hand tracking...');
             // Avvia hand tracking
             await this.handTracker.start();
             
+            this.updateStatus('Avvio rendering...');
             // Avvia rendering loop
             this.isARActive = true;
             this.animate();
             
             this.elements.cardboardBtn.disabled = false;
-            this.updateStatus('AR attivo');
+            this.updateStatus('AR attivo - Muovi le mani davanti alla camera');
+            
+            console.log('AR avviato con successo su dispositivo:', this.getDeviceInfo());
             
         } catch (error) {
             console.error('Errore avvio AR:', error);
-            this.updateStatus('Errore AR: ' + error.message);
+            const errorMsg = this.getDetailedErrorMessage(error);
+            this.updateStatus('Errore AR: ' + errorMsg);
             this.elements.startBtn.disabled = false;
         }
+    }
+    
+    checkDeviceSupport() {
+        // Verifica supporto WebGL
+        if (!this.renderer || !this.renderer.getContext()) {
+            throw new Error('WebGL non supportato su questo dispositivo');
+        }
+        
+        // Verifica supporto MediaDevices
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error('Accesso camera non supportato su questo browser');
+        }
+        
+        // Verifica supporto WASM per MediaPipe
+        if (typeof WebAssembly === 'undefined') {
+            throw new Error('WebAssembly non supportato - necessario per hand tracking');
+        }
+        
+        console.log('Verifiche supporto dispositivo completate');
+    }
+    
+    getDeviceInfo() {
+        return {
+            userAgent: navigator.userAgent,
+            platform: navigator.platform,
+            screenSize: `${window.innerWidth}x${window.innerHeight}`,
+            pixelRatio: window.devicePixelRatio,
+            webgl: this.renderer ? this.renderer.capabilities : 'non disponibile'
+        };
+    }
+    
+    getDetailedErrorMessage(error) {
+        if (error.name === 'NotAllowedError') {
+            return 'Permesso camera negato. Abilita la camera nelle impostazioni del browser.';
+        }
+        if (error.name === 'NotFoundError') {
+            return 'Nessuna camera trovata su questo dispositivo.';
+        }
+        if (error.name === 'NotSupportedError') {
+            return 'Camera non supportata su questo dispositivo.';
+        }
+        if (error.name === 'NotReadableError') {
+            return 'Camera in uso da altra applicazione.';
+        }
+        if (error.message.includes('WebGL')) {
+            return 'WebGL non supportato. Prova con un browser più recente.';
+        }
+        if (error.message.includes('MediaPipe') || error.message.includes('WASM')) {
+            return 'Hand tracking non supportato su questo dispositivo.';
+        }
+        return error.message;
     }
     
     async requestCameraPermission() {
@@ -235,7 +313,30 @@ class ARCardboardApp {
         
         // Aggiorna UI
         const handCount = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
-        this.elements.handsCount.textContent = handCount;
+        this.elements.gestureCount.textContent = handCount;
+        
+        // Aggiorna informazioni mani
+        if (results.multiHandLandmarks && results.multiHandedness) {
+            let leftHand = '-';
+            let rightHand = '-';
+            
+            for (let i = 0; i < results.multiHandedness.length; i++) {
+                const handedness = results.multiHandedness[i].label;
+                const landmarks = results.multiHandLandmarks[i];
+                
+                if (handedness === 'Left') {
+                    leftHand = 'Rilevata';
+                } else if (handedness === 'Right') {
+                    rightHand = 'Rilevata';
+                }
+            }
+            
+            this.elements.leftHand.textContent = leftHand;
+            this.elements.rightHand.textContent = rightHand;
+        } else {
+            this.elements.leftHand.textContent = '-';
+            this.elements.rightHand.textContent = '-';
+        }
     }
     
     animate() {
@@ -246,11 +347,15 @@ class ARCardboardApp {
         // Calcola FPS
         this.frameCount++;
         const currentTime = performance.now();
-        if (currentTime - this.lastTime >= 1000) {
-            const fps = Math.round((this.frameCount * 1000) / (currentTime - this.lastTime));
-            this.elements.fps.textContent = fps;
+        if (currentTime - this.lastFrameTime >= 1000) {
+            this.fps = Math.round((this.frameCount * 1000) / (currentTime - this.lastFrameTime));
             this.frameCount = 0;
-            this.lastTime = currentTime;
+            this.lastFrameTime = currentTime;
+        }
+        
+        // Aggiorna debug info
+        if (this.debugMode) {
+            this.updateDebugInfo();
         }
         
         // Aggiorna scena
@@ -263,6 +368,68 @@ class ARCardboardApp {
             this.cardboard.render(this.scene, this.camera);
         } else {
             this.renderer.render(this.scene, this.camera);
+        }
+    }
+    
+    toggleDebug() {
+        this.debugMode = !this.debugMode;
+        if (this.debugMode) {
+            this.elements.debugInfo.classList.add('show');
+            this.elements.debugBtn.textContent = 'Nascondi Debug';
+            this.initDebugInfo();
+        } else {
+            this.elements.debugInfo.classList.remove('show');
+            this.elements.debugBtn.textContent = 'Debug';
+        }
+    }
+    
+    initDebugInfo() {
+        // Informazioni dispositivo
+        const deviceInfo = this.getDeviceInfo();
+        this.elements.deviceInfo.textContent = deviceInfo.type;
+        
+        // Informazioni WebGL
+        const gl = this.renderer.getContext();
+        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+        const renderer = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : 'Unknown';
+        this.elements.webglInfo.textContent = renderer.substring(0, 30) + '...';
+        
+        // Informazioni camera
+        if (this.elements.video.srcObject) {
+            const track = this.elements.video.srcObject.getVideoTracks()[0];
+            const settings = track.getSettings();
+            this.elements.cameraInfo.textContent = `${settings.width}x${settings.height}`;
+        }
+    }
+    
+    updateDebugInfo() {
+        // FPS
+        this.elements.fpsInfo.textContent = this.fps;
+        
+        // Hand tracking status
+        const trackingStatus = this.handTracker && this.handTracker.isActive ? 'Attivo' : 'Inattivo';
+        this.elements.trackingInfo.textContent = trackingStatus;
+        
+        // Cube info
+        if (this.arScene && this.arScene.cube) {
+            const scale = this.arScene.cube.scale.x;
+            this.elements.scaleInfo.textContent = scale.toFixed(2) + 'x';
+            
+            // Distance and collision info
+            if (this.arScene.lastHandPosition) {
+                const distance = this.arScene.cube.position.distanceTo(this.arScene.lastHandPosition);
+                this.elements.distanceInfo.textContent = distance.toFixed(2);
+                
+                // Update collision indicator
+                const indicator = this.elements.collisionIndicator;
+                if (this.arScene.isInContact) {
+                    indicator.className = 'collision-indicator contact';
+                } else if (distance < this.arScene.collisionDistance * 2) {
+                    indicator.className = 'collision-indicator proximity';
+                } else {
+                    indicator.className = 'collision-indicator';
+                }
+            }
         }
     }
     

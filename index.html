@@ -114,6 +114,47 @@
             font-size: 12px;
             max-width: 200px;
         }
+        
+        .debug-info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #00ff00;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 11px;
+            z-index: 100;
+            max-width: 250px;
+            display: none;
+        }
+        
+        .debug-info.show {
+            display: block;
+        }
+        
+        .collision-indicator {
+            position: absolute;
+            top: 50%;
+            left: 20px;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #ff0000;
+            z-index: 100;
+            transition: background-color 0.2s;
+        }
+        
+        .collision-indicator.contact {
+            background: #00ff00;
+            box-shadow: 0 0 10px #00ff00;
+        }
+        
+        .collision-indicator.proximity {
+            background: #ffff00;
+        }
     </style>
 </head>
 <body>
@@ -139,10 +180,24 @@
             <div>• Pizzico: Scala cubo</div>
         </div>
         
+        <div class="debug-info" id="debug-info">
+            <div><strong>DEBUG INFO</strong></div>
+            <div>Dispositivo: <span id="device-info">-</span></div>
+            <div>Camera: <span id="camera-info">-</span></div>
+            <div>WebGL: <span id="webgl-info">-</span></div>
+            <div>Hand Tracking: <span id="tracking-info">-</span></div>
+            <div>Distanza cubo: <span id="distance-info">-</span></div>
+            <div>Scala cubo: <span id="scale-info">1.0x</span></div>
+            <div>FPS: <span id="fps-info">-</span></div>
+        </div>
+        
+        <div class="collision-indicator" id="collision-indicator"></div>
+        
         <div id="controls">
             <button class="btn" id="startBtn">Avvia AR</button>
             <button class="btn" id="cardboardBtn" disabled>Modalità Cardboard</button>
             <button class="btn" id="resetBtn">Reset Scena</button>
+            <button class="btn" id="debugBtn">Debug</button>
         </div>
     </div>
     

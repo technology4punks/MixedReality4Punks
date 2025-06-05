@@ -10,13 +10,19 @@ class ARScene {
         this.isGrabbing = false;
         this.grabbingHand = null;
         this.grabOffset = new THREE.Vector3();
-        this.initialCubeScale = 1;
         this.pinchStartDistance = 0;
+        this.initialCubeScale = 1;
         
         // Stato rotazione
         this.isRotating = false;
         this.lastRotationPosition = new THREE.Vector2();
         this.rotationSensitivity = 3.0;
+        
+        // Sistema collisioni
+        this.collisionDistance = 0.3; // Distanza per considerare "contatto"
+        this.isInContact = false;
+        this.contactFeedback = false;
+        this.lastHandPosition = null; // Per debug
         
         // Configurazione cubo
         this.cubeConfig = {
@@ -24,7 +30,9 @@ class ARScene {
             color: 0xff0000,
             position: { x: 0, y: 0, z: -1 },
             metalness: 0.3,
-            roughness: 0.4
+            roughness: 0.4,
+            maxScale: 5.0, // Ingrandimento massimo aumentato
+            minScale: 0.3   // Riduzione minima
         };
         
         // Limiti movimento cubo
@@ -177,6 +185,8 @@ class ARScene {
         if (!handResults.gestures || handResults.gestures.length === 0) {
             this.releaseGrab();
             this.stopRotation();
+            this.lastHandPosition = null;
+            this.updateCubeState('Idle');
             return;
         }
         
@@ -184,6 +194,11 @@ class ARScene {
         const grabGestures = handResults.gestures.filter(g => g.type === 'grab');
         const pinchGestures = handResults.gestures.filter(g => g.type === 'pinch');
         const openGestures = handResults.gestures.filter(g => g.type === 'open');
+        
+        // Salva la posizione della prima mano per debug
+        if (handResults.gestures.length > 0) {
+            this.lastHandPosition = handResults.gestures[0].position.clone();
+        }
         
         // Gestisci grab (movimento cubo)
         if (grabGestures.length > 0) {
@@ -207,18 +222,56 @@ class ARScene {
         }
     }
     
+    updateCubeState(state) {
+        const cubeStateElement = document.getElementById('cube-state');
+        if (cubeStateElement) {
+            cubeStateElement.textContent = state;
+        }
+    }
+    
     handleGrabGesture(grabGesture, handResults) {
         const handPosition = this.getHandWorldPosition(grabGesture.position);
         
+        // Verifica collisione con il cubo
+        const distance = this.checkCollisionWithCube(handPosition);
+        this.isInContact = distance < this.collisionDistance;
+        
         if (!this.isGrabbing) {
-            // Inizia grab se mano è vicina al cubo
-            const distance = handPosition.distanceTo(this.cube.position);
-            if (distance < 0.3) {
+            // Inizia grab SOLO se mano è in contatto con il cubo
+            if (this.isInContact) {
                 this.startGrab(grabGesture.hand, handPosition);
+                this.updateCubeState('Movimento');
+            } else {
+                // Feedback visivo quando si è vicini ma non in contatto
+                this.updateProximityFeedback(distance);
             }
         } else if (this.grabbingHand === grabGesture.hand) {
-            // Continua movimento
-            this.updateGrab(handPosition);
+            // Continua movimento solo se ancora in contatto
+            if (this.isInContact) {
+                this.updateGrab(handPosition);
+            } else {
+                // Rilascia se si perde il contatto
+                this.releaseGrab();
+            }
+        }
+    }
+    
+    checkCollisionWithCube(handPosition) {
+        // Calcola distanza dalla superficie del cubo, non dal centro
+        const cubeBox = new THREE.Box3().setFromObject(this.cube);
+        const closestPoint = cubeBox.clampPoint(handPosition, new THREE.Vector3());
+        return handPosition.distanceTo(closestPoint);
+    }
+    
+    updateProximityFeedback(distance) {
+        // Feedback visivo quando si è vicini al cubo
+        const proximityThreshold = 0.3;
+        if (distance < proximityThreshold && !this.contactFeedback) {
+            this.cube.material.emissive.setHex(0x111111); // Leggero bagliore
+            this.contactFeedback = true;
+        } else if (distance >= proximityThreshold && this.contactFeedback) {
+            this.cube.material.emissive.setHex(0x000000); // Rimuovi bagliore
+            this.contactFeedback = false;
         }
     }
     
@@ -252,13 +305,14 @@ class ARScene {
         if (this.isGrabbing) {
             this.isGrabbing = false;
             this.grabbingHand = null;
+            this.updateCubeState('Idle');
             
-            // Rimuovi feedback visivo se non si sta ruotando
-            if (!this.isRotating) {
+            // Rimuovi feedback visivo se non ci sono altre interazioni
+            if (!this.isRotating && !this.contactFeedback) {
                 this.cube.material.emissive.setHex(0x000000);
             }
             
-            console.log('Grab rilasciato');
+            console.log('Grab rilasciato - contatto perso');
         }
     }
     
@@ -269,65 +323,97 @@ class ARScene {
             const hand2Pos = this.getHandWorldPosition(pinchGestures[1].position);
             const distance = hand1Pos.distanceTo(hand2Pos);
             
-            if (this.pinchStartDistance === 0) {
-                this.pinchStartDistance = distance;
-                this.initialCubeScale = this.cube.scale.x;
+            // Verifica se almeno una mano è vicina al cubo per il controllo di collisione
+            const distance1 = this.checkCollisionWithCube(hand1Pos);
+            const distance2 = this.checkCollisionWithCube(hand2Pos);
+            const isNearCube = distance1 < this.collisionDistance * 2 || distance2 < this.collisionDistance * 2;
+            
+            if (isNearCube) {
+                if (this.pinchStartDistance === 0) {
+                    this.pinchStartDistance = distance;
+                    this.initialCubeScale = this.cube.scale.x;
+                    this.updateCubeState('Ridimensionamento');
+                }
+                
+                // Calcola scala basata su distanza mani con limiti aumentati
+                const scaleRatio = distance / this.pinchStartDistance;
+                const newScale = Math.max(
+                    this.cubeConfig.minScale, 
+                    Math.min(this.cubeConfig.maxScale, this.initialCubeScale * scaleRatio)
+                );
+                
+                this.cube.scale.setScalar(newScale);
+                
+                // Feedback visivo per scaling
+                this.cube.material.emissive.setHex(0x001133);
+                
+                console.log(`Scala cubo: ${newScale.toFixed(2)}x`);
             }
-            
-            // Calcola scala basata su distanza mani
-            const scaleRatio = distance / this.pinchStartDistance;
-            const newScale = Math.max(0.5, Math.min(3, this.initialCubeScale * scaleRatio));
-            
-            this.cube.scale.setScalar(newScale);
-            
-            // Feedback visivo
-            this.cube.material.emissive.setHex(0x001133);
             
         } else {
             // Reset pinch
+            if (this.pinchStartDistance !== 0) {
+                this.updateCubeState('Idle');
+            }
             this.pinchStartDistance = 0;
-            if (!this.isGrabbing && !this.isRotating) {
+            if (!this.isGrabbing && !this.isRotating && !this.contactFeedback) {
                 this.cube.material.emissive.setHex(0x000000);
             }
         }
     }
     
     handleRotationGesture(openGesture) {
-        const currentPos = new THREE.Vector2(openGesture.position.x, openGesture.position.y);
+        const handPosition = this.getHandWorldPosition(openGesture.position);
+        const distance = this.checkCollisionWithCube(handPosition);
+        const isNearCube = distance < this.collisionDistance * 1.5; // Leggermente più permissivo per rotazione
         
-        if (!this.isRotating) {
-            // Inizia rotazione
-            this.isRotating = true;
-            this.lastRotationPosition.copy(currentPos);
+        if (isNearCube) {
+            const currentPos = new THREE.Vector2(openGesture.position.x, openGesture.position.y);
             
-            // Feedback visivo per rotazione
-            this.cube.material.emissive.setHex(0x003300);
-            
-            console.log('Rotazione iniziata');
+            if (!this.isRotating) {
+                // Inizia rotazione solo se vicino al cubo
+                this.isRotating = true;
+                this.lastRotationPosition.copy(currentPos);
+                this.updateCubeState('Rotazione');
+                
+                // Feedback visivo per rotazione
+                this.cube.material.emissive.setHex(0x003300);
+                
+                console.log('Rotazione iniziata - mano in contatto');
+            } else {
+                // Continua rotazione
+                const deltaX = (currentPos.x - this.lastRotationPosition.x) * this.rotationSensitivity;
+                const deltaY = (currentPos.y - this.lastRotationPosition.y) * this.rotationSensitivity;
+                
+                // Applica rotazione al cubo
+                this.cube.rotation.y += deltaX;
+                this.cube.rotation.x += deltaY;
+                
+                // Aggiorna posizione precedente
+                this.lastRotationPosition.copy(currentPos);
+            }
         } else {
-            // Continua rotazione
-            const deltaX = (currentPos.x - this.lastRotationPosition.x) * this.rotationSensitivity;
-            const deltaY = (currentPos.y - this.lastRotationPosition.y) * this.rotationSensitivity;
-            
-            // Applica rotazione al cubo
-            this.cube.rotation.y += deltaX;
-            this.cube.rotation.x += deltaY;
-            
-            // Aggiorna posizione precedente
-            this.lastRotationPosition.copy(currentPos);
+            // Ferma rotazione se si allontana dal cubo
+            if (this.isRotating) {
+                this.stopRotation();
+            } else {
+                // Feedback di prossimità per rotazione
+                this.updateProximityFeedback(distance);
+            }
         }
     }
     
     stopRotation() {
         if (this.isRotating) {
             this.isRotating = false;
+            this.updateCubeState('Idle');
             
             // Rimuovi feedback visivo se non ci sono altre interazioni
-            if (!this.isGrabbing) {
+            if (!this.isGrabbing && !this.contactFeedback) {
                 this.cube.material.emissive.setHex(0x000000);
             }
             
-            console.log('Rotazione fermata');
+            console.log('Rotazione fermata - mano allontanata');
         }
     }
     
