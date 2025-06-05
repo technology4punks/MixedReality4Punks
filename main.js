@@ -1,7 +1,6 @@
 // === Configurazione base Three.js e WebXR ===
 let scene, camera, renderer, cube;
 let xrSession = null;
-let isARSupported = false;
 
 // === Setup MediaPipe Hands ===
 let hands, videoElement, cameraUtils;
@@ -11,7 +10,7 @@ let handLandmarks = [];
 const EYE_SEPARATION = 0.065; // distanza interpupillare media in metri
 
 // === Inizializzazione ===
-window.onload = async () => {
+window.onload = () => {
   // Setup video per MediaPipe Hands
   videoElement = document.createElement('video');
   videoElement.style.display = 'none';
@@ -35,31 +34,81 @@ window.onload = async () => {
   const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
   scene.add(light);
 
-  // WebXR AR
-  if (navigator.xr) {
-    isARSupported = await navigator.xr.isSessionSupported('immersive-ar');
-    if (isARSupported) {
-      startAR();
-    } else {
-      alert('WebXR AR non supportato su questo dispositivo/browser.');
-    }
-  } else {
-    alert('WebXR non disponibile.');
-  }
+  // Mostra pulsante per avviare AR
+  showARButton();
 
   // Avvia MediaPipe Hands
   setupMediaPipeHands();
 };
 
+function showARButton() {
+  if (!navigator.xr) {
+    showError('WebXR non disponibile su questo browser/dispositivo.');
+    return;
+  }
+  const btn = document.createElement('button');
+  btn.innerText = 'Avvia AR';
+  btn.id = 'ar-start-btn';
+  btn.style.position = 'absolute';
+  btn.style.top = '50%';
+  btn.style.left = '50%';
+  btn.style.transform = 'translate(-50%, -50%)';
+  btn.style.padding = '1em 2em';
+  btn.style.fontSize = '1.2em';
+  btn.style.zIndex = 10;
+  btn.style.background = '#ff2222';
+  btn.style.color = '#fff';
+  btn.style.border = 'none';
+  btn.style.borderRadius = '8px';
+  btn.style.cursor = 'pointer';
+  document.body.appendChild(btn);
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    btn.innerText = 'Avvio...';
+    try {
+      await startAR();
+      btn.remove();
+    } catch (e) {
+      showError('Impossibile avviare la sessione AR.\n' + e.message);
+      btn.disabled = false;
+      btn.innerText = 'Avvia AR';
+    }
+  });
+}
+
+function showError(msg) {
+  let err = document.getElementById('ar-error-msg');
+  if (!err) {
+    err = document.createElement('div');
+    err.id = 'ar-error-msg';
+    err.style.position = 'absolute';
+    err.style.top = '10%';
+    err.style.left = '50%';
+    err.style.transform = 'translateX(-50%)';
+    err.style.background = 'rgba(0,0,0,0.8)';
+    err.style.color = '#fff';
+    err.style.padding = '1em 2em';
+    err.style.borderRadius = '8px';
+    err.style.zIndex = 20;
+    err.style.fontSize = '1.1em';
+    document.body.appendChild(err);
+  }
+  err.innerText = msg;
+}
+
 // === Avvio sessione AR ===
 async function startAR() {
-  xrSession = await navigator.xr.requestSession('immersive-ar', {
-    requiredFeatures: ['local', 'hit-test']
-  });
-  renderer.xr.enabled = true;
-  renderer.xr.setReferenceSpaceType('local');
-  await renderer.xr.setSession(xrSession);
-  renderer.setAnimationLoop(onXRFrame);
+  try {
+    xrSession = await navigator.xr.requestSession('immersive-ar', {
+      requiredFeatures: ['local', 'hit-test']
+    });
+    renderer.xr.enabled = true;
+    renderer.xr.setReferenceSpaceType('local');
+    await renderer.xr.setSession(xrSession);
+    renderer.setAnimationLoop(onXRFrame);
+  } catch (e) {
+    throw new Error('WebXR AR non supportato o permessi negati.');
+  }
 }
 
 // === Rendering stereoscopico split screen ===
