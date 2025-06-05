@@ -285,9 +285,6 @@ class ARCardboardApp {
         }
         return null;
     }
-        
-        console.log('Verifiche supporto dispositivo completate');
-    }
     
     getDeviceInfo() {
         return {
