@@ -169,41 +169,56 @@ function onHandsResults(results) {
   handLandmarks = results.multiHandLandmarks || [];
 }
 
-// === Logica manipolazione cubo ===
+// === Logica manipolazione cubo migliorata con pinch ===
+let lastPinch = null;
 let lastDistance = null;
-let lastRotation = null;
+
+function isPinching(hand) {
+  // Distanza tra pollice (4) e indice (8)
+  const dx = hand[4].x - hand[8].x;
+  const dy = hand[4].y - hand[8].y;
+  const dz = hand[4].z - hand[8].z;
+  const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+  return dist < 0.05; // Soglia empirica, regola se serve
+}
 
 function updateCubeWithHands() {
-  if (handLandmarks.length === 1) {
-    // Rotazione con una mano (es. indice e pollice)
+  if (handLandmarks.length === 1 && isPinching(handLandmarks[0])) {
+    // Pinch con una mano: ruota il cubo
     const hand = handLandmarks[0];
-    const index = hand[8]; // indice
-    const thumb = hand[4]; // pollice
-    const dx = index.x - thumb.x;
-    const dy = index.y - thumb.y;
-    const angle = Math.atan2(dy, dx);
-    if (lastRotation !== null) {
-      const delta = angle - lastRotation;
+    const index = hand[8];
+    const thumb = hand[4];
+    const angle = Math.atan2(index.y - thumb.y, index.x - thumb.x);
+    if (lastPinch !== null) {
+      const delta = angle - lastPinch;
       cube.rotation.y += delta * 2.0;
+      cube.material.emissive.setHex(0x00ff00); // Feedback: cubo verde quando preso
     }
-    lastRotation = angle;
+    lastPinch = angle;
     lastDistance = null;
-  } else if (handLandmarks.length === 2) {
-    // Scala con due mani (distanza tra palmi)
-    const hand1 = handLandmarks[0][0]; // palmo mano 1
-    const hand2 = handLandmarks[1][0]; // palmo mano 2
+  } else if (
+    handLandmarks.length === 2 &&
+    isPinching(handLandmarks[0]) &&
+    isPinching(handLandmarks[1])
+  ) {
+    // Pinch con due mani: scala il cubo
+    const hand1 = handLandmarks[0][0];
+    const hand2 = handLandmarks[1][0];
     const dx = hand1.x - hand2.x;
     const dy = hand1.y - hand2.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
     if (lastDistance !== null) {
       const scale = cube.scale.x * (distance / lastDistance);
       cube.scale.setScalar(THREE.MathUtils.clamp(scale, 0.5, 2.5));
+      cube.material.emissive.setHex(0x0000ff); // Feedback: cubo blu quando scalato
     }
     lastDistance = distance;
-    lastRotation = null;
+    lastPinch = null;
   } else {
+    // Nessun pinch: cubo fermo, colore normale
+    lastPinch = null;
     lastDistance = null;
-    lastRotation = null;
+    cube.material.emissive.setHex(0x000000);
   }
 }
 
