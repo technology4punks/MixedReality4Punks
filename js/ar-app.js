@@ -11,34 +11,36 @@ class ARCardboardApp {
         this.handLandmarks = null;
         this.currentCameraFacing = 'environment';
         
-        // Proprietà per comportamento naturale - ZONA PIÀ RESTRITTIVA
+        // Proprietà per comportamento naturale - MIGLIORATO
         this.handVisualizers = [];
         this.interactionState = {
             isNearCube: false,
             isGrabbing: false,
-            grabDistance: 0.5,
-            hoverDistance: 0.7,
+            grabDistance: 0.8, // AUMENTATO per mobile
+            hoverDistance: 1.2, // AUMENTATO per mobile
             grabHand: null,
             grabOffset: new THREE.Vector3(),
             lastGrabPosition: new THREE.Vector3(),
             twoHandsRequired: false,
             bothHandsNear: false,
-            handsDetected: false // AGGIUNTO per tracciare se ci sono mani
+            handsDetected: false,
+            rotationMode: false // AGGIUNTO per rotazione
         };
         
         this.cubePhysics = {
             velocity: new THREE.Vector3(),
             angularVelocity: new THREE.Vector3(),
-            damping: 0.92,
-            gravity: -0.002,
+            damping: 0.95, // AUMENTATO per stabilità
+            gravity: 0, // DISABILITATO completamente
             restPosition: new THREE.Vector3(0, 0, 0),
             isResting: false,
-            enableGravity: false // AGGIUNTO per controllare la gravità
+            enableGravity: false
         };
         
         this.handHistory = [];
         this.gestureState = 'none';
         this.proximityIndicator = null;
+        this.lastHandUpdate = 0; // AGGIUNTO per debug tracking
         
         this.init();
     }
@@ -105,70 +107,76 @@ class ARCardboardApp {
         this.scene = new THREE.Scene();
         
         this.camera = new THREE.PerspectiveCamera(
-            70,
+            75, // AUMENTATO FOV per mobile
             window.innerWidth / window.innerHeight,
             0.01,
             1000
         );
-        this.camera.position.set(0, 0, 3);
+        this.camera.position.set(0, 0, 2); // AVVICINATO per mobile
+        
+        // MIGLIORATO per mobile
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         
         this.renderer = new THREE.WebGLRenderer({
             canvas: this.canvas,
             alpha: true,
-            antialias: true,
+            antialias: !isMobile, // Disabilita antialiasing su mobile
             powerPreference: 'high-performance'
         });
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        this.renderer.setClearColor(0x000000, 0);
-        this.renderer.shadowMap.enabled = true;
-        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
+        this.renderer.setClearColor(0x000000, 0);
+        
+        // Ombre semplificate per mobile
+        if (!isMobile) {
+            this.renderer.shadowMap.enabled = true;
+            this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        }
+        
+        // Illuminazione migliorata
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6); // AUMENTATO
         this.scene.add(ambientLight);
         
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0); // AUMENTATO
         directionalLight.position.set(5, 5, 5);
-        directionalLight.castShadow = true;
-        directionalLight.shadow.mapSize.width = 1024;
-        directionalLight.shadow.mapSize.height = 1024;
+        if (!isMobile) {
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 512; // RIDOTTO per performance
+            directionalLight.shadow.mapSize.height = 512;
+        }
         this.scene.add(directionalLight);
         
-        const geometry = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+        // Cubo più grande e visibile
+        const geometry = new THREE.BoxGeometry(0.8, 0.8, 0.8); // AUMENTATO
         const material = new THREE.MeshPhongMaterial({ 
             color: 0xff3030,
             shininess: 100,
             specular: 0x222222,
             transparent: true,
-            opacity: 0.9
+            opacity: 1.0 // AUMENTATO per visibilità
         });
         
         this.cube = new THREE.Mesh(geometry, material);
         this.cube.position.copy(this.cubePhysics.restPosition);
-        this.cube.castShadow = true;
-        this.cube.receiveShadow = true;
+        if (!isMobile) {
+            this.cube.castShadow = true;
+            this.cube.receiveShadow = true;
+        }
         this.scene.add(this.cube);
         
+        // Wireframe più visibile
         const edges = new THREE.EdgesGeometry(geometry);
         const lineMaterial = new THREE.LineBasicMaterial({ 
             color: 0xffffff, 
-            linewidth: 2,
+            linewidth: 3, // AUMENTATO
             transparent: true,
-            opacity: 0.6
+            opacity: 0.8 // AUMENTATO
         });
         const wireframe = new THREE.LineSegments(edges, lineMaterial);
         this.cube.add(wireframe);
         
         this.createProximityIndicator();
-        
-        const planeGeometry = new THREE.PlaneGeometry(10, 10);
-        const planeMaterial = new THREE.ShadowMaterial({ opacity: 0.3 });
-        const plane = new THREE.Mesh(planeGeometry, planeMaterial);
-        plane.rotation.x = -Math.PI / 2;
-        plane.position.y = -2;
-        plane.receiveShadow = true;
-        this.scene.add(plane);
-        
         this.createHandVisualizers();
     }
     
@@ -227,27 +235,38 @@ class ARCardboardApp {
             }
         });
         
+        // MIGLIORATO per stabilità
         this.hands.setOptions({
             maxNumHands: 2,
-            modelComplexity: 1,
-            minDetectionConfidence: 0.7,
-            minTrackingConfidence: 0.7
+            modelComplexity: 0, // RIDOTTO per performance mobile
+            minDetectionConfidence: 0.6, // RIDOTTO per sensibilità
+            minTrackingConfidence: 0.6 // RIDOTTO per sensibilità
         });
         
         this.hands.onResults(this.onHandsResults.bind(this));
         
         const camera = new Camera(this.video, {
             onFrame: async () => {
-                await this.hands.send({ image: this.video });
+                try {
+                    await this.hands.send({ image: this.video });
+                    this.lastHandUpdate = Date.now(); // AGGIUNTO per debug
+                } catch (error) {
+                    console.warn('Errore MediaPipe:', error);
+                    // Riprova dopo un breve delay
+                    setTimeout(() => {
+                        this.setupMediaPipe();
+                    }, 1000);
+                }
             },
-            width: 1280,
-            height: 720
+            width: 640, // RIDOTTO per performance
+            height: 480
         });
         camera.start();
     }
     
     onHandsResults(results) {
         this.handLandmarks = results.multiHandLandmarks;
+        this.lastHandUpdate = Date.now();
         
         // Aggiorna lo stato di rilevamento mani
         this.interactionState.handsDetected = this.handLandmarks && this.handLandmarks.length > 0;
@@ -263,15 +282,32 @@ class ARCardboardApp {
             const proximityInfo = this.getProximityInfo();
             
             document.getElementById('handInfo').innerHTML = 
-                `🖐️ Mani: ${handCount} | ${proximityInfo} | 🎯 ${gestureInfo}`;
+                `🖐️ Mani: ${handCount} | ${proximityInfo} | 🎯 ${gestureInfo} | ⏱️ ${Date.now() - this.lastHandUpdate}ms`;
         } else {
-            document.getElementById('handInfo').textContent = 
-                '👋 Posiziona le mani davanti alla camera';
+            // MIGLIORATO: Controlla se il tracking è bloccato
+            const timeSinceLastUpdate = Date.now() - this.lastHandUpdate;
+            if (timeSinceLastUpdate > 3000) {
+                document.getElementById('handInfo').innerHTML = 
+                    '⚠️ Tracking bloccato - Riavvio in corso...';
+                this.restartMediaPipe();
+            } else {
+                document.getElementById('handInfo').textContent = 
+                    '👋 Posiziona le mani davanti alla camera';
+            }
             this.resetInteractionState();
         }
     }
     
-    // FUNZIONE MANCANTE - AGGIUNTA
+    // AGGIUNTO: Riavvio MediaPipe
+    restartMediaPipe() {
+        if (this.hands) {
+            this.hands.close();
+        }
+        setTimeout(() => {
+            this.setupMediaPipe();
+        }, 1000);
+    }
+    
     resetInteractionState() {
         this.gestureState = 'none';
         this.interactionState.isGrabbing = false;
@@ -487,17 +523,21 @@ class ARCardboardApp {
     
     handleActiveGrab(handData) {
         const targetPosition = handData.center.clone().add(this.interactionState.grabOffset);
-        this.cube.position.lerp(targetPosition, 0.3);
+        this.cube.position.lerp(targetPosition, 0.4); // AUMENTATO per responsività
         
         const velocity = handData.center.clone().sub(this.interactionState.lastGrabPosition);
-        this.cubePhysics.velocity.copy(velocity.multiplyScalar(0.1));
+        this.cubePhysics.velocity.copy(velocity.multiplyScalar(0.15)); // AUMENTATO
         
         this.interactionState.lastGrabPosition.copy(handData.center);
         
+        // MIGLIORATO: Rotazione più fluida
         const deltaMovement = velocity.length();
-        if (deltaMovement > 0.01) {
-            this.cube.rotation.x += velocity.y * 2;
-            this.cube.rotation.y += velocity.x * 2;
+        if (deltaMovement > 0.005) { // RIDOTTA soglia
+            // Rotazione basata sul movimento della mano
+            const rotationSpeed = Math.min(deltaMovement * 5, 0.2); // LIMITATO
+            this.cube.rotation.x += velocity.y * rotationSpeed * 10;
+            this.cube.rotation.y += velocity.x * rotationSpeed * 10;
+            this.cube.rotation.z += (velocity.x + velocity.y) * rotationSpeed * 5;
         }
     }
     
