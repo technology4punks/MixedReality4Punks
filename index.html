@@ -1,13 +1,48 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="it">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AR Cardboard Web App</title>
-  <link rel="stylesheet" href="style.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR Cardboard - Cubo Interattivo</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- Rimuovi temporaneamente il manifest -->
+    <!-- <link rel="manifest" href="manifest.json"> -->
 </head>
 <body>
-  <video id="video" autoplay playsinline></video>
-  <script type="module" src="main.js"></script>
+    <div class="container">
+        <video id="video" autoplay muted playsinline></video>
+        <canvas id="canvas"></canvas>
+        
+        <div class="controls">
+            <button id="cardboardBtn" class="btn">📱 Modalità Cardboard</button>
+            <button id="cameraBtn" class="btn">📷 Camera Frontale</button>
+        </div>
+        
+        <div class="info-panel">
+            <div id="handInfo">👋 Posiziona le mani davanti alla camera</div>
+            <div class="instructions">
+                <h3>🎯 Istruzioni (Zona Restrittiva):</h3>
+                <ul>
+                    <li><strong>✊ Una mano (pugno):</strong> Muovi il cubo (solo nella zona vicina)</li>
+                    <li><strong>🤏🤏 Due mani (pizzico):</strong> Ridimensiona e ruota (solo vicino al cubo)</li>
+                    <li><strong>👉 Punta:</strong> Attrazione leggera</li>
+                    <li><strong>📷 Cambia Camera:</strong> Alterna tra frontale e posteriore</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="js/ar-app.js"></script>
+    
+    <!-- Rimuovi temporaneamente il Service Worker -->
+    <!-- <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+    </script> -->
 </body>
 </html>
