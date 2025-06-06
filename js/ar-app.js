@@ -11,7 +11,7 @@ class ARCardboardApp {
         this.handLandmarks = null;
         this.currentCameraFacing = 'environment';
         
-        // Proprietà per comportamento naturale - ZONA PIÙ RESTRITTIVA
+        // Proprietà per comportamento naturale - ZONA PIÀ RESTRITTIVA
         this.handVisualizers = [];
         this.interactionState = {
             isNearCube: false,
@@ -707,9 +707,12 @@ class ARCardboardApp {
         this.cameraR = this.camera.clone();
         this.cameraR.position.x += 0.032;
         
+        // Imposta il rendering per vista stereoscopica
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.setScissorTest(true);
+        this.renderer.autoClear = false; // AGGIUNTO per controllo manuale del clear
         
+        // Fullscreen e orientamento
         if (document.documentElement.requestFullscreen) {
             document.documentElement.requestFullscreen();
         }
@@ -717,11 +720,16 @@ class ARCardboardApp {
         if (screen.orientation && screen.orientation.lock) {
             screen.orientation.lock('landscape');
         }
+        
+        // Ottimizzazioni mobile
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     }
     
     disableCardboardMode() {
         this.renderer.setScissorTest(false);
+        this.renderer.autoClear = true; // RIPRISTINA il clear automatico
         this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         
         if (document.exitFullscreen) {
             document.exitFullscreen();
@@ -729,52 +737,39 @@ class ARCardboardApp {
     }
     
     handleDeviceOrientation(event) {
-        // DISABILITATO per evitare che il cubo segua il movimento del telefono
-        // Mantieni la camera fissa per un'esperienza AR più stabile
-        return;
-        
-        /* CODICE ORIGINALE COMMENTATO:
-        if (!this.camera) return;
+        // MIGLIORATO: Orientamento limitato per stabilità AR
+        if (!this.camera || this.isCardboardMode) return;
         
         const alpha = event.alpha ? THREE.MathUtils.degToRad(event.alpha) : 0;
         const beta = event.beta ? THREE.MathUtils.degToRad(event.beta) : 0;
         const gamma = event.gamma ? THREE.MathUtils.degToRad(event.gamma) : 0;
         
-        this.camera.rotation.set(beta, alpha, -gamma);
-        */
-    }
-    
-    onWindowResize() {
-        this.camera.aspect = window.innerWidth / window.innerHeight;
-        this.camera.updateProjectionMatrix();
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
-    }
-    
-    animate() {
-        requestAnimationFrame(() => this.animate());
-        
-        if (this.isCardboardMode) {
-            this.renderCardboard();
-        } else {
-            this.renderNormal();
-        }
-    }
-    
-    renderNormal() {
-        this.renderer.render(this.scene, this.camera);
+        // Applica rotazione limitata per stabilità
+        const dampingFactor = 0.1;
+        this.camera.rotation.x = THREE.MathUtils.lerp(this.camera.rotation.x, beta * 0.5, dampingFactor);
+        this.camera.rotation.y = THREE.MathUtils.lerp(this.camera.rotation.y, alpha * 0.3, dampingFactor);
+        this.camera.rotation.z = THREE.MathUtils.lerp(this.camera.rotation.z, -gamma * 0.2, dampingFactor);
     }
     
     renderCardboard() {
         const width = window.innerWidth / 2;
         const height = window.innerHeight;
         
+        // Clear manuale per entrambi gli occhi
+        this.renderer.clear();
+        
+        // Occhio sinistro
         this.renderer.setScissor(0, 0, width, height);
         this.renderer.setViewport(0, 0, width, height);
         this.renderer.render(this.scene, this.cameraL);
         
+        // Occhio destro
         this.renderer.setScissor(width, 0, width, height);
         this.renderer.setViewport(width, 0, width, height);
         this.renderer.render(this.scene, this.cameraR);
+        
+        // Reset viewport per il prossimo frame
+        this.renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
     }
 }
 

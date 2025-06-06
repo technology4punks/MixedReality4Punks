@@ -170,6 +170,40 @@
     color: #00ff00;
 }
 
+/* Aggiungi queste regole per migliorare la stabilità mobile */
+@media (max-width: 768px) {
+    .container {
+        overflow: hidden;
+    }
+    
+    #video {
+        transform: scale(1.1); /* Leggero zoom per coprire meglio lo schermo */
+    }
+    
+    .controls {
+        bottom: 20px;
+        gap: 10px;
+    }
+    
+    .btn {
+        padding: 12px 16px;
+        font-size: 14px;
+        min-width: 120px;
+    }
+    
+    .info-panel {
+        font-size: 12px;
+        padding: 8px;
+    }
+}
+
+/* Orientamento landscape per Cardboard */
+@media (orientation: landscape) {
+    .info-panel {
+        display: none; /* Nascondi info in modalità landscape */
+    }
+}
+
 @media (max-width: 768px) {
     .info-panel {
         max-width: 280px;
