@@ -751,6 +751,37 @@ class ARCardboardApp {
         this.camera.rotation.z = THREE.MathUtils.lerp(this.camera.rotation.z, -gamma * 0.2, dampingFactor);
     }
     
+    // FUNZIONE MANCANTE - AGGIUNTA
+    onWindowResize() {
+        this.camera.aspect = window.innerWidth / window.innerHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        
+        // Aggiorna anche le camere Cardboard se esistono
+        if (this.cameraL && this.cameraR) {
+            this.cameraL.aspect = window.innerWidth / window.innerHeight;
+            this.cameraL.updateProjectionMatrix();
+            this.cameraR.aspect = window.innerWidth / window.innerHeight;
+            this.cameraR.updateProjectionMatrix();
+        }
+    }
+    
+    // FUNZIONE MANCANTE - AGGIUNTA
+    animate() {
+        requestAnimationFrame(() => this.animate());
+        
+        if (this.isCardboardMode) {
+            this.renderCardboard();
+        } else {
+            this.renderNormal();
+        }
+    }
+    
+    // FUNZIONE MANCANTE - AGGIUNTA
+    renderNormal() {
+        this.renderer.render(this.scene, this.camera);
+    }
+    
     renderCardboard() {
         const width = window.innerWidth / 2;
         const height = window.innerHeight;
