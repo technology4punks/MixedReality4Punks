@@ -1,230 +1,94 @@
-// === Configurazione base Three.js e WebXR ===
-let scene, camera, renderer, cube;
-let xrSession = null;
+import * as THREE from 'https://cdn.skypack.dev/three@0.158.0';
+import { ARButton } from 'https://cdn.skypack.dev/three@0.158.0/examples/jsm/webxr/ARButton.js';
+import * as handPoseDetection from 'https://cdn.skypack.dev/@tensorflow-models/hand-pose-detection';
+import '@tensorflow/tfjs-backend-webgl';
 
-// === Setup MediaPipe Hands ===
-let hands, videoElement, cameraUtils;
-let handLandmarks = [];
+// Setup scena, camera, renderer
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
-// === Parametri stereoscopici ===
-const EYE_SEPARATION = 0.065; // distanza interpupillare media in metri
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.xr.enabled = true;
+document.body.appendChild(renderer.domElement);
 
-// === Inizializzazione ===
-window.onload = () => {
-  // Setup video per MediaPipe Hands
-  videoElement = document.createElement('video');
-  videoElement.style.display = 'none';
-  document.body.appendChild(videoElement);
+// Bottone AR WebXR
+document.body.appendChild(ARButton.createButton(renderer, {
+  requiredFeatures: ['hit-test'],
+  optionalFeatures: ['dom-overlay'],
+  domOverlay: { root: document.body }
+}));
 
-  // Setup Three.js
-  scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-  renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('ar-canvas'), alpha: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(window.devicePixelRatio);
+// Cubo rosso
+const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+const cube = new THREE.Mesh(geometry, material);
+cube.position.set(0, 0, -0.5);
+scene.add(cube);
 
-  // Cubo rosso
-  const geometry = new THREE.BoxGeometry(0.15, 0.15, 0.15);
-  const material = new THREE.MeshStandardMaterial({ color: 0xff2222 });
-  cube = new THREE.Mesh(geometry, material);
-  cube.position.set(0, 0, -0.7);
-  scene.add(cube);
+// Luce
+const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+scene.add(light);
 
-  // Luce
-  const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
-  scene.add(light);
+// Video per la fotocamera
+const video = document.getElementById('video');
 
-  // Mostra pulsante per avviare AR
-  showARButton();
+let detector;
+let handDetected = false;
+let gestureValue = 0;
 
-  // Avvia MediaPipe Hands
-  setupMediaPipeHands();
-};
+// Setup MediaPipe Hands
+async function initHandTracking() {
+  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+  video.srcObject = stream;
 
-function showARButton() {
-  if (!navigator.xr) {
-    showError('WebXR non disponibile su questo browser/dispositivo.');
-    return;
-  }
-  const btn = document.createElement('button');
-  btn.innerText = 'Avvia AR';
-  btn.id = 'ar-start-btn';
-  btn.style.position = 'absolute';
-  btn.style.top = '50%';
-  btn.style.left = '50%';
-  btn.style.transform = 'translate(-50%, -50%)';
-  btn.style.padding = '1em 2em';
-  btn.style.fontSize = '1.2em';
-  btn.style.zIndex = 10;
-  btn.style.background = '#ff2222';
-  btn.style.color = '#fff';
-  btn.style.border = 'none';
-  btn.style.borderRadius = '8px';
-  btn.style.cursor = 'pointer';
-  document.body.appendChild(btn);
-  btn.addEventListener('click', async () => {
-    btn.disabled = true;
-    btn.innerText = 'Avvio...';
-    try {
-      await startAR();
-      btn.remove();
-    } catch (e) {
-      showError('Impossibile avviare la sessione AR.\n' + e.message);
-      btn.disabled = false;
-      btn.innerText = 'Avvia AR';
+  detector = await handPoseDetection.createDetector(handPoseDetection.SupportedModels.MediaPipeHands, {
+    runtime: 'tfjs',
+    modelType: 'lite',
+    maxHands: 1
+  });
+
+  detectHands();
+}
+
+// Loop di rilevamento mani
+async function detectHands() {
+  if (!detector) return;
+  const predictions = await detector.estimateHands(video);
+  if (predictions.length > 0) {
+    handDetected = true;
+    const hand = predictions[0];
+    const indexFingerTip = hand.keypoints.find(p => p.name === 'index_finger_tip');
+    if (indexFingerTip) {
+      gestureValue = indexFingerTip.x;
     }
-  });
-}
-
-function showError(msg) {
-  let err = document.getElementById('ar-error-msg');
-  if (!err) {
-    err = document.createElement('div');
-    err.id = 'ar-error-msg';
-    err.style.position = 'absolute';
-    err.style.top = '10%';
-    err.style.left = '50%';
-    err.style.transform = 'translateX(-50%)';
-    err.style.background = 'rgba(0,0,0,0.8)';
-    err.style.color = '#fff';
-    err.style.padding = '1em 2em';
-    err.style.borderRadius = '8px';
-    err.style.zIndex = 20;
-    err.style.fontSize = '1.1em';
-    document.body.appendChild(err);
-  }
-  err.innerText = msg;
-}
-
-// === Avvio sessione AR ===
-async function startAR() {
-  try {
-    xrSession = await navigator.xr.requestSession('immersive-ar', {
-      requiredFeatures: ['local', 'hit-test']
-    });
-    renderer.xr.enabled = true;
-    renderer.xr.setReferenceSpaceType('local');
-    await renderer.xr.setSession(xrSession);
-    renderer.setAnimationLoop(onXRFrame);
-  } catch (e) {
-    throw new Error('WebXR AR non supportato o permessi negati.');
-  }
-}
-
-// === Rendering stereoscopico split screen ===
-function onXRFrame(time, frame) {
-  // Ottieni pose XR
-  const session = renderer.xr.getSession();
-  if (!session) return;
-
-  // Aggiorna logica cubo in base alle mani
-  updateCubeWithHands();
-
-  // Split screen: sinistra/destra
-  const width = window.innerWidth / 2;
-  const height = window.innerHeight;
-
-  // Occhio sinistro
-  renderer.setScissorTest(true);
-  renderer.setScissor(0, 0, width, height);
-  renderer.setViewport(0, 0, width, height);
-  camera.position.x = -EYE_SEPARATION / 2;
-  renderer.render(scene, camera);
-
-  // Occhio destro
-  renderer.setScissor(width, 0, width, height);
-  renderer.setViewport(width, 0, width, height);
-  camera.position.x = EYE_SEPARATION / 2;
-  renderer.render(scene, camera);
-
-  // Reset camera
-  camera.position.x = 0;
-  renderer.setScissorTest(false);
-}
-
-// === MediaPipe Hands setup ===
-function setupMediaPipeHands() {
-  hands = new Hands({
-    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-  });
-  hands.setOptions({
-    maxNumHands: 2,
-    modelComplexity: 1,
-    minDetectionConfidence: 0.7,
-    minTrackingConfidence: 0.7
-  });
-  hands.onResults(onHandsResults);
-
-  cameraUtils = new CameraUtils.Camera(videoElement, {
-    onFrame: async () => {
-      await hands.send({ image: videoElement });
-    },
-    width: 640,
-    height: 480
-  });
-  cameraUtils.start();
-}
-
-function onHandsResults(results) {
-  handLandmarks = results.multiHandLandmarks || [];
-}
-
-// === Logica manipolazione cubo migliorata con pinch ===
-let lastPinch = null;
-let lastDistance = null;
-
-function isPinching(hand) {
-  // Distanza tra pollice (4) e indice (8)
-  const dx = hand[4].x - hand[8].x;
-  const dy = hand[4].y - hand[8].y;
-  const dz = hand[4].z - hand[8].z;
-  const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
-  return dist < 0.05; // Soglia empirica, regola se serve
-}
-
-function updateCubeWithHands() {
-  if (handLandmarks.length === 1 && isPinching(handLandmarks[0])) {
-    // Pinch con una mano: ruota il cubo
-    const hand = handLandmarks[0];
-    const index = hand[8];
-    const thumb = hand[4];
-    const angle = Math.atan2(index.y - thumb.y, index.x - thumb.x);
-    if (lastPinch !== null) {
-      const delta = angle - lastPinch;
-      cube.rotation.y += delta * 2.0;
-      cube.material.emissive.setHex(0x00ff00); // Feedback: cubo verde quando preso
-    }
-    lastPinch = angle;
-    lastDistance = null;
-  } else if (
-    handLandmarks.length === 2 &&
-    isPinching(handLandmarks[0]) &&
-    isPinching(handLandmarks[1])
-  ) {
-    // Pinch con due mani: scala il cubo
-    const hand1 = handLandmarks[0][0];
-    const hand2 = handLandmarks[1][0];
-    const dx = hand1.x - hand2.x;
-    const dy = hand1.y - hand2.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    if (lastDistance !== null) {
-      const scale = cube.scale.x * (distance / lastDistance);
-      cube.scale.setScalar(THREE.MathUtils.clamp(scale, 0.5, 2.5));
-      cube.material.emissive.setHex(0x0000ff); // Feedback: cubo blu quando scalato
-    }
-    lastDistance = distance;
-    lastPinch = null;
   } else {
-    // Nessun pinch: cubo fermo, colore normale
-    lastPinch = null;
-    lastDistance = null;
-    cube.material.emissive.setHex(0x000000);
+    handDetected = false;
+  }
+  requestAnimationFrame(detectHands);
+}
+
+// Interazione gestuale
+function handleHandInteraction() {
+  if (handDetected) {
+    cube.rotation.y = gestureValue * 0.01;
   }
 }
 
-// === Resize handler ===
+// Loop di animazione
+function animate() {
+  renderer.setAnimationLoop(() => {
+    handleHandInteraction();
+    renderer.render(scene, camera);
+  });
+}
+
+animate();
+initHandTracking();
+
+// Responsività
 window.addEventListener('resize', () => {
-  renderer.setSize(window.innerWidth, window.innerHeight);
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-}); 
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});

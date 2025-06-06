@@ -1,23 +1,13 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>AR Cardboard Hands</title>
-  <link rel="stylesheet" href="style.css">
-  <!-- Three.js CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.min.js"></script>
-  <!-- WebXR Polyfill (opzionale, fallback) -->
-  <script src="https://cdn.jsdelivr.net/npm/webxr-polyfill@latest/build/webxr-polyfill.min.js"></script>
-  <!-- MediaPipe Hands CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
-  <!-- MediaPipe CameraUtils CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AR Cardboard Web App</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="ar-container">
-    <canvas id="ar-canvas"></canvas>
-  </div>
-  <script src="main.js"></script>
+  <video id="video" autoplay playsinline></video>
+  <script type="module" src="main.js"></script>
 </body>
-</html> 
+</html>
