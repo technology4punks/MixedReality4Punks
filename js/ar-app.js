@@ -191,30 +191,67 @@ class ARMobileApp {
         this.camera = new THREE.PerspectiveCamera(75, aspect, 0.1, 1000);
         this.camera.position.z = 5;
         
-        // Renderer with error handling
+        // Renderer with progressive fallback options
         const isLowEnd = this.deviceInfo && this.deviceInfo.isLowEndDevice;
-        try {
-            this.renderer = new THREE.WebGLRenderer({ 
+        const fallbackConfigs = [
+            {
                 canvas: this.canvas,
                 alpha: true,
                 antialias: isLowEnd ? false : true,
-                powerPreference: isLowEnd ? 'low-power' : 'high-performance'
-            });
-        } catch (error) {
-            console.warn('WebGL not supported, trying fallback options:', error);
-            // Try without antialias
+                powerPreference: isLowEnd ? 'low-power' : 'high-performance',
+                preserveDrawingBuffer: false,
+                failIfMajorPerformanceCaveat: false
+            },
+            {
+                canvas: this.canvas,
+                alpha: true,
+                antialias: false,
+                powerPreference: 'low-power',
+                preserveDrawingBuffer: false,
+                failIfMajorPerformanceCaveat: false
+            },
+            {
+                canvas: this.canvas,
+                alpha: false,
+                antialias: false,
+                preserveDrawingBuffer: false,
+                failIfMajorPerformanceCaveat: false
+            }
+        ];
+        
+        let rendererCreated = false;
+        for (let i = 0; i < fallbackConfigs.length && !rendererCreated; i++) {
             try {
-                this.renderer = new THREE.WebGLRenderer({ 
-                    canvas: this.canvas,
-                    alpha: true,
-                    antialias: false
-                });
-            } catch (fallbackError) {
-                throw new Error('WebGL not supported on this device: ' + fallbackError.message);
+                console.log(`Tentativo ${i + 1} di creazione renderer WebGL...`);
+                this.renderer = new THREE.WebGLRenderer(fallbackConfigs[i]);
+                rendererCreated = true;
+                console.log(`Renderer WebGL creato con successo (configurazione ${i + 1})`);
+            } catch (error) {
+                console.warn(`Configurazione ${i + 1} fallita:`, error.message);
+                if (i === fallbackConfigs.length - 1) {
+                    // Last attempt failed, try CSS3D renderer as ultimate fallback
+                    try {
+                        console.log('Tentativo con CSS3DRenderer come fallback finale...');
+                        this.renderer = new THREE.CSS3DRenderer({ element: this.canvas });
+                        this.isCSS3D = true;
+                        rendererCreated = true;
+                        console.log('CSS3DRenderer creato come fallback');
+                    } catch (css3dError) {
+                        throw new Error('Nessun renderer 3D supportato su questo dispositivo');
+                    }
+                }
             }
         }
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.setClearColor(0x000000, 0); // Trasparente per AR
+        if (!this.isCSS3D) {
+            this.renderer.setSize(window.innerWidth, window.innerHeight);
+            this.renderer.setClearColor(0x000000, 0); // Trasparente per AR
+        } else {
+            // CSS3D renderer setup
+            this.renderer.setSize(window.innerWidth, window.innerHeight);
+            this.renderer.domElement.style.position = 'absolute';
+            this.renderer.domElement.style.top = '0';
+            this.renderer.domElement.style.pointerEvents = 'none';
+        }
         
         // Luci
         const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
