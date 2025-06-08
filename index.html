@@ -263,18 +263,33 @@
             }
             
             async init() {
+                console.log('🚀 Inizializzazione A-Frame AR App...');
+                document.getElementById('status').textContent = 'Inizializzazione...';
+                
                 try {
+                    console.log('📹 Configurazione camera...');
                     await this.setupCamera();
+                    console.log('✅ Camera configurata con successo');
+                    
+                    console.log('👋 Configurazione hand tracking...');
                     await this.setupHandTracking();
+                    console.log('✅ Hand tracking configurato con successo');
+                    
+                    console.log('🎮 Configurazione event listeners...');
                     this.setupEventListeners();
+                    console.log('✅ Event listeners configurati');
+                    
+                    console.log('🎬 Avvio animazione...');
                     this.startAnimation();
+                    console.log('✅ Animazione avviata');
                     
                     document.getElementById('loading').classList.add('hidden');
-                    document.getElementById('status').textContent = 'Pronto';
+                    document.getElementById('status').textContent = 'Pronto - AR Attivo';
                     
-                    console.log('A-Frame AR App inizializzata con successo');
+                    console.log('🎉 A-Frame AR App inizializzata con successo');
                 } catch (error) {
-                    console.error('Errore durante l\'inizializzazione:', error);
+                    console.error('❌ Errore durante l\'inizializzazione:', error);
+                    console.error('Stack trace:', error.stack);
                     document.getElementById('status').textContent = 'Errore: ' + error.message;
                 }
             }
@@ -327,12 +342,22 @@
             
             async setupHandTracking() {
                 try {
+                    console.log('👋 Creazione istanza MediaPipe Hands...');
+                    
+                    // Verifica disponibilità MediaPipe
+                    if (typeof Hands === 'undefined') {
+                        throw new Error('MediaPipe Hands non disponibile');
+                    }
+                    
                     this.hands = new Hands({
                         locateFile: (file) => {
-                            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+                            const url = `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+                            console.log('📦 Caricamento file MediaPipe:', url);
+                            return url;
                         }
                     });
                     
+                    console.log('⚙️ Configurazione opzioni MediaPipe...');
                     this.hands.setOptions({
                         maxNumHands: 2,
                         modelComplexity: 1,
@@ -340,28 +365,58 @@
                         minTrackingConfidence: 0.5
                     });
                     
-                    this.hands.onResults((results) => this.onHandResults(results));
+                    console.log('🔗 Collegamento callback risultati...');
+                    this.hands.onResults((results) => {
+                        console.log('📊 Risultati hand tracking ricevuti:', {
+                            handsDetected: results.multiHandLandmarks ? results.multiHandLandmarks.length : 0,
+                            timestamp: Date.now()
+                        });
+                        this.onHandResults(results);
+                    });
                     
+                    // Verifica disponibilità Camera utils
+                    if (typeof Camera === 'undefined') {
+                        throw new Error('MediaPipe Camera utils non disponibile');
+                    }
+                    
+                    console.log('📷 Creazione Camera utils...');
                     this.cameraUtils = new Camera(this.video, {
                         onFrame: async () => {
-                            await this.hands.send({ image: this.video });
+                            try {
+                                await this.hands.send({ image: this.video });
+                            } catch (frameError) {
+                                console.warn('⚠️ Errore invio frame:', frameError);
+                            }
                         },
                         width: 1280,
                         height: 720
                     });
                     
+                    console.log('▶️ Avvio Camera utils...');
                     await this.cameraUtils.start();
                     
-                    console.log('Hand tracking inizializzato');
+                    console.log('✅ Hand tracking inizializzato con successo');
                 } catch (error) {
-                    console.error('Errore hand tracking:', error);
-                    throw new Error('Impossibile inizializzare il riconoscimento mani');
+                    console.error('❌ Errore hand tracking:', error);
+                    console.error('Stack trace:', error.stack);
+                    throw new Error('Impossibile inizializzare il riconoscimento mani: ' + error.message);
                 }
             }
             
             onHandResults(results) {
                 const handsCount = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
                 document.getElementById('hands-count').textContent = handsCount;
+                
+                // Debug dettagliato
+                if (handsCount > 0) {
+                    console.log('👋 Mani rilevate:', {
+                        count: handsCount,
+                        landmarks: results.multiHandLandmarks.map(hand => hand.length),
+                        handedness: results.multiHandedness ? results.multiHandedness.map(h => h.label) : 'N/A'
+                    });
+                } else {
+                    console.log('👋 Nessuna mano rilevata');
+                }
                 
                 // Nascondi tutte le mani
                 this.handLeft.setAttribute('visible', false);
@@ -372,9 +427,21 @@
                         const landmarks = results.multiHandLandmarks[i];
                         const handedness = results.multiHandedness[i];
                         
+                        console.log(`🖐️ Processando mano ${i + 1}:`, {
+                            label: handedness.label,
+                            score: handedness.score,
+                            landmarksCount: landmarks.length
+                        });
+                        
                         // Usa il landmark del polso (indice 0) per la posizione base
                         const wrist = landmarks[0];
                         const middleFinger = landmarks[9]; // Punto medio della mano
+                        
+                        console.log('📍 Coordinate polso:', {
+                            x: wrist.x,
+                            y: wrist.y,
+                            z: wrist.z
+                        });
                         
                         // Converti coordinate normalizzate in coordinate 3D con scala migliorata
                         const x = (wrist.x - 0.5) * 6; // Scala aumentata per migliore tracking
@@ -491,37 +558,72 @@
             }
             
             toggleARMode() {
+                console.log('🔄 Toggle AR Mode - Stato attuale:', this.isARMode);
+                
                 this.isARMode = !this.isARMode;
+                const arButton = document.getElementById('ar-btn');
+                const scene = document.querySelector('a-scene');
+                
+                console.log('🎯 Nuovo stato AR:', this.isARMode);
+                console.log('🎬 Scena A-Frame trovata:', !!scene);
+                console.log('🔘 Pulsante AR trovato:', !!arButton);
                 
                 if (this.isARMode) {
+                    console.log('✅ Attivazione modalità AR...');
+                    
                     // Attiva modalità AR
-                    this.scene.setAttribute('arjs', 'sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;');
-                    this.scene.setAttribute('background', 'color: transparent');
+                    if (arButton) {
+                        arButton.textContent = 'Disattiva AR';
+                        arButton.style.backgroundColor = '#ff4444';
+                    }
+                    
+                    // Configura la scena per AR
+                    if (scene) {
+                        console.log('⚙️ Configurazione scena AR...');
+                        scene.setAttribute('arjs', 'sourceType: webcam; debugUIEnabled: false;');
+                        scene.setAttribute('vr-mode-ui', 'enabled: false');
+                        console.log('✅ Scena AR configurata');
+                    }
+                    
+                    // Rendi il video visibile come sfondo
+                    console.log('📹 Configurazione video background...');
                     this.video.style.display = 'block';
-                    document.getElementById('mode').textContent = 'AR Attiva';
-                    document.getElementById('ar-btn').textContent = '📱 Normale';
-                    document.getElementById('ar-btn').style.background = '#ff4444';
+                    this.video.style.position = 'fixed';
+                    this.video.style.top = '0';
+                    this.video.style.left = '0';
+                    this.video.style.width = '100%';
+                    this.video.style.height = '100%';
+                    this.video.style.objectFit = 'cover';
+                    this.video.style.zIndex = '-1';
+                    console.log('✅ Video background configurato');
                     
-                    // Ottimizza la camera per AR
-                    this.camera.setAttribute('position', '0 0 0');
-                    this.camera.setAttribute('look-controls', 'enabled: false');
-                    
-                    console.log('Modalità AR attivata');
+                    document.getElementById('status').textContent = 'AR Mode Attivo';
                 } else {
+                    console.log('❌ Disattivazione modalità AR...');
+                    
                     // Disattiva modalità AR
-                    this.scene.removeAttribute('arjs');
-                    this.scene.setAttribute('background', 'color: #000');
-                    this.video.style.display = 'block';
-                    document.getElementById('mode').textContent = 'Normale';
-                    document.getElementById('ar-btn').textContent = '🌍 AR Mode';
-                    document.getElementById('ar-btn').style.background = '#00ff00';
+                    if (arButton) {
+                        arButton.textContent = 'AR Mode';
+                        arButton.style.backgroundColor = '#4CAF50';
+                    }
                     
-                    // Ripristina controlli camera normali
-                    this.camera.setAttribute('position', '0 1.6 0');
-                    this.camera.setAttribute('look-controls', 'enabled: true');
+                    // Rimuovi configurazione AR
+                    if (scene) {
+                        console.log('🔧 Rimozione configurazione AR...');
+                        scene.removeAttribute('arjs');
+                        scene.setAttribute('vr-mode-ui', 'enabled: true');
+                        console.log('✅ Configurazione AR rimossa');
+                    }
                     
-                    console.log('Modalità AR disattivata');
+                    // Nascondi il video
+                    console.log('📹 Nascondimento video...');
+                    this.video.style.display = 'none';
+                    console.log('✅ Video nascosto');
+                    
+                    document.getElementById('status').textContent = 'Modalità Normale';
                 }
+                
+                console.log('🎯 Toggle AR Mode completato');
             }
         }
         
