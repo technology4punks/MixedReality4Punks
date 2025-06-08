@@ -35,6 +35,8 @@
     <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v6.1.1/dist/aframe-extras.min.js"></script>
+    <!-- A-Frame AR.js for better AR support -->
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.min.js"></script>
     
     <style>
         * {
@@ -144,6 +146,7 @@
     </div>
     
     <button id="cardboard-btn" onclick="toggleCardboardMode()">📱 Cardboard</button>
+    <button id="ar-btn" onclick="toggleARMode()" style="position: fixed; bottom: 20px; left: 20px; z-index: 1000; background: #00ff00; color: white; border: none; padding: 15px 20px; border-radius: 25px; font-size: 16px; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">🌍 AR Mode</button>
     
     <!-- A-Frame Scene -->
     <a-scene 
@@ -151,10 +154,12 @@
         embedded 
         style="height: 100vh; width: 100vw; position: fixed; top: 0; left: 0; z-index: 1;"
         vr-mode-ui="enabled: true"
+        ar-mode-ui="enabled: true"
         device-orientation-permission-ui="enabled: false"
         background="color: transparent"
         renderer="antialias: true; colorManagement: true; sortObjects: true; physicallyCorrectLights: true; alpha: true"
-        loading-screen="enabled: false">
+        loading-screen="enabled: false"
+        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;">
         
         <!-- Assets -->
         <a-assets>
@@ -168,11 +173,13 @@
                   position="0 1.6 0" 
                   look-controls="enabled: true" 
                   wasd-controls="enabled: false"
-                  cursor="rayOrigin: mouse">
+                  cursor="rayOrigin: mouse"
+                  raycaster="objects: [data-raycastable]">
             <a-cursor 
                 position="0 0 -1"
                 geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
-                material="color: white; shader: flat">
+                material="color: white; shader: flat"
+                raycaster="objects: [data-raycastable]">
             </a-cursor>
         </a-camera>
         
@@ -182,25 +189,40 @@
                position="0 1.5 -2"
                rotation="0 45 0"
                scale="0.5 0.5 0.5"
+               data-raycastable
                animation__rotate="property: rotation; to: 0 405 0; loop: true; dur: 4000; easing: linear"
                animation__hover="property: scale; to: 0.6 0.6 0.6; startEvents: mouseenter; dur: 200"
                animation__leave="property: scale; to: 0.5 0.5 0.5; startEvents: mouseleave; dur: 200">
         </a-box>
         
-        <!-- Hand Tracking Spheres (will be positioned by JavaScript) -->
-        <a-sphere id="hand-left" 
-                  position="-1 1.5 -1" 
-                  radius="0.05" 
-                  material="color: #00ff00; transparent: true; opacity: 0.8"
-                  visible="false">
-        </a-sphere>
+        <!-- Hand Tracking Avatars -->
+        <a-entity id="hand-left" visible="false">
+            <!-- Palm -->
+            <a-sphere position="0 0 0" radius="0.08" material="color: #ffdbac; metalness: 0.1; roughness: 0.9"></a-sphere>
+            <!-- Fingers -->
+            <a-cylinder id="finger-left-1" position="0.06 0.02 0.08" radius="0.015" height="0.12" rotation="15 0 0" material="color: #ffdbac; metalness: 0.1; roughness: 0.9"></a-cylinder>
+            <a-cylinder id="finger-left-2" position="0.02 0.02 0.1" radius="0.015" height="0.14" rotation="5 0 0" material="color: #ffdbac; metalness: 0.1; roughness: 0.9"></a-cylinder>
+            <a-cylinder id="finger-left-3" position="-0.02 0.02 0.1" radius="0.015" height="0.13" rotation="-5 0 0" material="color: #ffdbac; metalness: 0.1; roughness: 0.9"></a-cylinder>
+            <a-cylinder id="finger-left-4" position="-0.06 0.02 0.08" radius="0.015" height="0.11" rotation="-15 0 0" material="color: #ffdbac; metalness: 0.1; roughness: 0.9"></a-cylinder>
+            <!-- Thumb -->
+            <a-cylinder id="thumb-left" position="0.08 0 0.02" radius="0.018" height="0.1" rotation="0 0 45" material="color: #ffdbac; metalness: 0.1; roughness: 0.9"></a-cylinder>
+            <!-- Glow effect -->
+            <a-sphere position="0 0 0" radius="0.12" material="color: #00ff00; transparent: true; opacity: 0.3; shader: flat"></a-sphere>
+        </a-entity>
         
-        <a-sphere id="hand-right" 
-                  position="1 1.5 -1" 
-                  radius="0.05" 
-                  material="color: #0000ff; transparent: true; opacity: 0.8"
-                  visible="false">
-        </a-sphere>
+        <a-entity id="hand-right" visible="false">
+            <!-- Palm -->
+            <a-sphere position="0 0 0" radius="0.08" material="color: #ffdbac; metalness: 0.1; roughness: 0.9"></a-sphere>
+            <!-- Fingers -->
+            <a-cylinder id="finger-right-1" position="-0.06 0.02 0.08" radius="0.015" height="0.12" rotation="15 0 0" material="color: #ffdbac; metalness: 0.1; roughness: 0.9"></a-cylinder>
+            <a-cylinder id="finger-right-2" position="-0.02 0.02 0.1" radius="0.015" height="0.14" rotation="5 0 0" material="color: #ffdbac; metalness: 0.1; roughness: 0.9"></a-cylinder>
+            <a-cylinder id="finger-right-3" position="0.02 0.02 0.1" radius="0.015" height="0.13" rotation="-5 0 0" material="color: #ffdbac; metalness: 0.1; roughness: 0.9"></a-cylinder>
+            <a-cylinder id="finger-right-4" position="0.06 0.02 0.08" radius="0.015" height="0.11" rotation="-15 0 0" material="color: #ffdbac; metalness: 0.1; roughness: 0.9"></a-cylinder>
+            <!-- Thumb -->
+            <a-cylinder id="thumb-right" position="-0.08 0 0.02" radius="0.018" height="0.1" rotation="0 0 -45" material="color: #ffdbac; metalness: 0.1; roughness: 0.9"></a-cylinder>
+            <!-- Glow effect -->
+            <a-sphere position="0 0 0" radius="0.12" material="color: #0000ff; transparent: true; opacity: 0.3; shader: flat"></a-sphere>
+        </a-entity>
         
         <!-- Lighting -->
         <a-light type="ambient" color="#404040" intensity="0.4"></a-light>
@@ -231,6 +253,7 @@
                 this.video = document.querySelector('#video-background');
                 
                 this.isCardboardMode = false;
+                this.isARMode = false;
                 this.hands = null;
                 this.cameraUtils = null;
                 this.lastTime = 0;
@@ -258,21 +281,47 @@
             
             async setupCamera() {
                 try {
-                    const stream = await navigator.mediaDevices.getUserMedia({
+                    // Prova prima la camera posteriore con impostazioni ottimizzate per mobile
+                    const constraints = {
                         video: {
-                            facingMode: 'environment',
-                            width: { ideal: 1280 },
-                            height: { ideal: 720 }
+                            facingMode: { exact: 'environment' },
+                            width: { ideal: 1920, min: 1280 },
+                            height: { ideal: 1080, min: 720 },
+                            frameRate: { ideal: 30, min: 15 }
                         }
-                    });
+                    };
+                    
+                    let stream;
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    } catch (exactError) {
+                        console.warn('Camera posteriore esatta non disponibile, provo con fallback');
+                        // Fallback se la camera posteriore esatta non è disponibile
+                        const fallbackConstraints = {
+                            video: {
+                                facingMode: 'environment',
+                                width: { ideal: 1280 },
+                                height: { ideal: 720 }
+                            }
+                        };
+                        stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+                    }
                     
                     this.video.srcObject = stream;
                     await this.video.play();
                     
-                    console.log('Camera inizializzata');
+                    // Log delle capacità della camera
+                    const track = stream.getVideoTracks()[0];
+                    const settings = track.getSettings();
+                    console.log('Camera inizializzata:', {
+                        facingMode: settings.facingMode,
+                        width: settings.width,
+                        height: settings.height,
+                        frameRate: settings.frameRate
+                    });
                 } catch (error) {
                     console.error('Errore camera:', error);
-                    throw new Error('Impossibile accedere alla camera');
+                    throw new Error('Impossibile accedere alla camera posteriore');
                 }
             }
             
@@ -323,24 +372,56 @@
                         const landmarks = results.multiHandLandmarks[i];
                         const handedness = results.multiHandedness[i];
                         
-                        // Prendi il landmark del polso (indice 0)
+                        // Usa il landmark del polso (indice 0) per la posizione base
                         const wrist = landmarks[0];
+                        const middleFinger = landmarks[9]; // Punto medio della mano
                         
-                        // Converti coordinate normalizzate in coordinate 3D
-                        const x = (wrist.x - 0.5) * 4; // Scala e centra
-                        const y = -(wrist.y - 0.5) * 3 + 1.5; // Inverti Y e centra
-                        const z = -2 + (wrist.z || 0) * 2; // Profondità
+                        // Converti coordinate normalizzate in coordinate 3D con scala migliorata
+                        const x = (wrist.x - 0.5) * 6; // Scala aumentata per migliore tracking
+                        const y = -(wrist.y - 0.5) * 4 + 1.5; // Inverti Y e centra
+                        const z = -1.5 + (wrist.z || 0) * 3; // Profondità migliorata
                         
                         const isLeft = handedness.label === 'Left';
-                        const handSphere = isLeft ? this.handLeft : this.handRight;
+                        const handEntity = isLeft ? this.handLeft : this.handRight;
                         
-                        handSphere.setAttribute('position', `${x} ${y} ${z}`);
-                        handSphere.setAttribute('visible', true);
+                        // Calcola rotazione della mano basata sui landmark
+                        const rotationY = this.calculateHandRotation(landmarks, isLeft);
+                        
+                        handEntity.setAttribute('position', `${x} ${y} ${z}`);
+                        handEntity.setAttribute('rotation', `0 ${rotationY} 0`);
+                        handEntity.setAttribute('visible', true);
+                        
+                        // Animazione di pulsazione quando la mano è rilevata
+                        handEntity.setAttribute('animation__pulse', {
+                            property: 'scale',
+                            to: '1.1 1.1 1.1',
+                            dur: 500,
+                            direction: 'alternate',
+                            loop: true
+                        });
                         
                         // Interazione con il cubo
                         this.checkHandCubeInteraction(x, y, z);
                     }
                 }
+            }
+            
+            calculateHandRotation(landmarks, isLeft) {
+                // Calcola la rotazione basata sulla direzione della mano
+                const wrist = landmarks[0];
+                const middleFinger = landmarks[9];
+                
+                const dx = middleFinger.x - wrist.x;
+                const dy = middleFinger.y - wrist.y;
+                
+                let angle = Math.atan2(dx, dy) * (180 / Math.PI);
+                
+                // Aggiusta per la differenza tra mano sinistra e destra
+                if (isLeft) {
+                    angle += 180;
+                }
+                
+                return angle;
             }
             
             checkHandCubeInteraction(handX, handY, handZ) {
@@ -408,12 +489,52 @@
                     document.getElementById('cardboard-btn').textContent = '📱 Cardboard';
                 }
             }
+            
+            toggleARMode() {
+                this.isARMode = !this.isARMode;
+                
+                if (this.isARMode) {
+                    // Attiva modalità AR
+                    this.scene.setAttribute('arjs', 'sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;');
+                    this.scene.setAttribute('background', 'color: transparent');
+                    this.video.style.display = 'block';
+                    document.getElementById('mode').textContent = 'AR Attiva';
+                    document.getElementById('ar-btn').textContent = '📱 Normale';
+                    document.getElementById('ar-btn').style.background = '#ff4444';
+                    
+                    // Ottimizza la camera per AR
+                    this.camera.setAttribute('position', '0 0 0');
+                    this.camera.setAttribute('look-controls', 'enabled: false');
+                    
+                    console.log('Modalità AR attivata');
+                } else {
+                    // Disattiva modalità AR
+                    this.scene.removeAttribute('arjs');
+                    this.scene.setAttribute('background', 'color: #000');
+                    this.video.style.display = 'block';
+                    document.getElementById('mode').textContent = 'Normale';
+                    document.getElementById('ar-btn').textContent = '🌍 AR Mode';
+                    document.getElementById('ar-btn').style.background = '#00ff00';
+                    
+                    // Ripristina controlli camera normali
+                    this.camera.setAttribute('position', '0 1.6 0');
+                    this.camera.setAttribute('look-controls', 'enabled: true');
+                    
+                    console.log('Modalità AR disattivata');
+                }
+            }
         }
         
-        // Funzione globale per il pulsante Cardboard
+        // Funzioni globali per i pulsanti
         function toggleCardboardMode() {
             if (window.arApp) {
                 window.arApp.toggleCardboardMode();
+            }
+        }
+        
+        function toggleARMode() {
+            if (window.arApp) {
+                window.arApp.toggleARMode();
             }
         }
         
