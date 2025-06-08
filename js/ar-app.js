@@ -36,7 +36,64 @@ class ARMobileApp {
         this.instructionsOverlay = document.getElementById('instructions');
     }
     
+    checkWebGLSupport() {
+        try {
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            return !!gl;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    showErrorMessage(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 0, 0, 0.9);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 10000;
+            max-width: 80%;
+            font-size: 16px;
+        `;
+        errorDiv.innerHTML = `
+            <h3>⚠️ Errore</h3>
+            <p>${message}</p>
+            <p><small>Prova con un browser diverso o aggiorna il tuo dispositivo</small></p>
+        `;
+        document.body.appendChild(errorDiv);
+        
+        // Remove after 10 seconds
+        setTimeout(() => {
+            if (errorDiv.parentNode) {
+                errorDiv.parentNode.removeChild(errorDiv);
+            }
+        }, 10000);
+    }
+
     checkCompatibility() {
+        // Check for required APIs
+        const requiredAPIs = {
+            'WebGL': this.checkWebGLSupport(),
+            'getUserMedia': !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+            'Service Worker': 'serviceWorker' in navigator
+        };
+        
+        const missingAPIs = Object.entries(requiredAPIs)
+            .filter(([name, supported]) => !supported)
+            .map(([name]) => name);
+        
+        if (missingAPIs.length > 0) {
+            console.warn('APIs mancanti:', missingAPIs);
+            this.updateStatus(`APIs non supportate: ${missingAPIs.join(', ')}`, 'warning');
+        }
+        
         if (!this.deviceInfo.supportsWebGL) {
             throw new Error('WebGL non supportato su questo dispositivo');
         }
@@ -66,6 +123,11 @@ class ARMobileApp {
             // Inizializza UI
             this.initUI();
             
+            // Check WebGL support first
+            if (!this.checkWebGLSupport()) {
+                throw new Error('WebGL non supportato su questo dispositivo');
+            }
+            
             // Verifica compatibilità
             this.checkCompatibility();
             
@@ -93,6 +155,7 @@ class ARMobileApp {
         } catch (error) {
             console.error('Errore inizializzazione:', error);
             this.updateStatus('Errore: ' + error.message, 'error');
+            this.showErrorMessage(error.message);
         }
     }
     
@@ -128,12 +191,27 @@ class ARMobileApp {
         this.camera = new THREE.PerspectiveCamera(75, aspect, 0.1, 1000);
         this.camera.position.z = 5;
         
-        // Renderer
-        this.renderer = new THREE.WebGLRenderer({ 
-            canvas: this.canvas,
-            alpha: true,
-            antialias: true
-        });
+        // Renderer with error handling
+        try {
+            this.renderer = new THREE.WebGLRenderer({ 
+                canvas: this.canvas,
+                alpha: true,
+                antialias: this.mobileUtils.isLowEndDevice() ? false : true,
+                powerPreference: this.mobileUtils.isLowEndDevice() ? 'low-power' : 'high-performance'
+            });
+        } catch (error) {
+            console.warn('WebGL not supported, trying fallback options:', error);
+            // Try without antialias
+            try {
+                this.renderer = new THREE.WebGLRenderer({ 
+                    canvas: this.canvas,
+                    alpha: true,
+                    antialias: false
+                });
+            } catch (fallbackError) {
+                throw new Error('WebGL not supported on this device: ' + fallbackError.message);
+            }
+        }
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.setClearColor(0x000000, 0); // Trasparente per AR
         
