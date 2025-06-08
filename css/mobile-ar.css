@@ -1,0 +1,328 @@
+/* Ottimizzazioni specifiche per AR Mobile e Cardboard */
+
+/* Reset e base */
+* {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+html, body {
+    height: 100%;
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+}
+
+/* Prevenzione zoom accidentale */
+input, textarea, select {
+    font-size: 16px !important;
+}
+
+/* Container principale ottimizzato */
+#container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Video camera background */
+#video {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    min-width: 100%;
+    min-height: 100%;
+    width: auto;
+    height: auto;
+    transform: translate(-50%, -50%);
+    z-index: 1;
+    object-fit: cover;
+}
+
+/* Canvas 3D overlay */
+#canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    pointer-events: none;
+}
+
+/* UI Controls */
+#controls {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 10;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 12px;
+    line-height: 1.4;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: opacity 0.3s ease;
+}
+
+#controls div {
+    margin: 2px 0;
+}
+
+#controls span {
+    font-weight: bold;
+    color: #00ff88;
+}
+
+/* Pulsante Cardboard */
+#cardboard-btn {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    z-index: 10;
+    background: linear-gradient(135deg, #ff4444, #cc3333);
+    color: white;
+    border: none;
+    padding: 12px 18px;
+    border-radius: 50px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(255, 68, 68, 0.4);
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+#cardboard-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 68, 68, 0.6);
+}
+
+#cardboard-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 10px rgba(255, 68, 68, 0.4);
+}
+
+/* Loading screen */
+#loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+    z-index: 5;
+    text-align: center;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 20px 30px;
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+}
+
+#loading::after {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 40px;
+    margin: 15px auto 0;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-top: 3px solid #fff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Modalità Cardboard */
+.cardboard-mode {
+    overflow: hidden;
+}
+
+.cardboard-mode #controls {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.cardboard-mode #cardboard-btn {
+    bottom: 10px;
+    right: 10px;
+    padding: 8px 12px;
+    font-size: 12px;
+}
+
+/* Visualizzazione stereoscopica */
+.stereo-container {
+    display: flex;
+    width: 100%;
+    height: 100%;
+}
+
+.stereo-eye {
+    width: 50%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+}
+
+.stereo-eye canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Separatore centrale per Cardboard */
+.cardboard-separator {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 2px;
+    height: 100%;
+    background: #000;
+    z-index: 15;
+    transform: translateX(-50%);
+}
+
+/* Ottimizzazioni per performance */
+.gpu-accelerated {
+    transform: translateZ(0);
+    will-change: transform;
+}
+
+/* Media queries per diversi dispositivi */
+@media screen and (max-width: 480px) {
+    #controls {
+        font-size: 10px;
+        padding: 6px 8px;
+        top: 5px;
+        left: 5px;
+    }
+    
+    #cardboard-btn {
+        padding: 10px 14px;
+        font-size: 12px;
+        bottom: 15px;
+        right: 15px;
+    }
+    
+    #loading {
+        font-size: 16px;
+        padding: 15px 20px;
+    }
+}
+
+@media screen and (orientation: landscape) {
+    #controls {
+        top: 5px;
+        left: 5px;
+        font-size: 11px;
+    }
+    
+    #cardboard-btn {
+        bottom: 10px;
+        right: 10px;
+    }
+}
+
+/* Stili per dispositivi ad alta densità */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    #controls {
+        border-width: 0.5px;
+    }
+    
+    #cardboard-btn {
+        border-width: 1px;
+    }
+}
+
+/* Animazioni per feedback visivo */
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.hand-detected {
+    animation: pulse 0.5s ease-in-out;
+}
+
+/* Indicatori di stato */
+.status-indicator {
+    position: absolute;
+    top: 50px;
+    left: 10px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    z-index: 11;
+}
+
+.status-indicator.active {
+    background: #00ff88;
+    box-shadow: 0 0 10px #00ff88;
+}
+
+.status-indicator.error {
+    background: #ff4444;
+    box-shadow: 0 0 10px #ff4444;
+}
+
+.status-indicator.loading {
+    background: #ffaa00;
+    box-shadow: 0 0 10px #ffaa00;
+    animation: pulse 1s infinite;
+}
+
+/* Overlay per istruzioni */
+.instructions-overlay {
+    position: absolute;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 10px 15px;
+    border-radius: 20px;
+    font-size: 12px;
+    text-align: center;
+    z-index: 9;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: opacity 0.3s ease;
+}
+
+.instructions-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Ottimizzazioni per Safari iOS */
+@supports (-webkit-touch-callout: none) {
+    #video {
+        -webkit-transform: translate(-50%, -50%);
+    }
+    
+    #canvas {
+        -webkit-transform: translateZ(0);
+    }
+}
+
+/* Prevenzione del bounce su iOS */
+body {
+    position: fixed;
+    overflow: hidden;
+    -webkit-overflow-scrolling: touch;
+}

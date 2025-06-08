@@ -2,60 +2,260 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR Cardboard - Cubo Interattivo</title>
-    <link rel="stylesheet" href="css/styles.css">
-    <!-- Rimuovi temporaneamente il manifest -->
-    <!-- <link rel="manifest" href="manifest.json"> -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="description" content="Esperienza di realtà aumentata mobile con supporto Google Cardboard e riconoscimento mani">
+    <meta name="keywords" content="AR, realtà aumentata, mobile, cardboard, VR, mani, three.js">
+    <meta name="author" content="AR Mobile Team">
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="AR Mobile">
+    <meta name="mobile-web-app-capable" content="yes">
+    
+    <!-- Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="icons/icon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="icons/icon-144.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="icons/icon-120.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="icons/icon-114.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="icons/icon-76.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="icons/icon-72.png">
+    <link rel="apple-touch-icon" sizes="60x60" href="icons/icon-60.png">
+    <link rel="apple-touch-icon" sizes="57x57" href="icons/icon-57.png">
+    
+    <title>AR Mobile Cardboard Experience</title>
+    <link rel="stylesheet" href="css/mobile-ar.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background: #000;
+            overflow: hidden;
+            touch-action: none;
+        }
+        
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
+        }
+        
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        #cardboard-btn {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 10;
+            background: #ff4444;
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 18px;
+            z-index: 5;
+        }
+        
+        .stereo-view {
+            display: flex;
+        }
+        
+        .eye {
+            width: 50%;
+            height: 100vh;
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
+    <div id="container">
         <video id="video" autoplay muted playsinline></video>
         <canvas id="canvas"></canvas>
+        <div id="loading">Caricamento AR Experience...</div>
         
-        <div class="controls">
-            <button id="cardboardBtn" class="btn">📱 Modalità Cardboard</button>
-            <button id="cameraBtn" class="btn">📷 Camera Frontale</button>
+        <div class="status-indicator loading" id="status-indicator"></div>
+        
+        <div id="controls">
+            <div>Stato: <span id="status">Inizializzazione...</span></div>
+            <div>Mani rilevate: <span id="hands-count">0</span></div>
+            <div>FPS: <span id="fps">0</span></div>
+            <div>Modalità: <span id="mode">Normale</span></div>
         </div>
         
-        <div class="info-panel">
-            <div id="handInfo">👋 Posiziona le mani davanti alla camera</div>
-            <div class="instructions">
-                <h3>🎯 Istruzioni (Zona Restrittiva):</h3>
-                <ul>
-                    <li><strong>✊ Una mano (pugno):</strong> Muovi il cubo (solo nella zona vicina)</li>
-                    <li><strong>🤏🤏 Due mani (pizzico):</strong> Ridimensiona e ruota (solo vicino al cubo)</li>
-                    <li><strong>👉 Punta:</strong> Attrazione leggera</li>
-                    <li><strong>📷 Cambia Camera:</strong> Alterna tra frontale e posteriore</li>
-                </ul>
-            </div>
+        <div class="instructions-overlay" id="instructions">
+            Muovi la mano davanti alla camera per interagire con il cubo rosso
         </div>
+        
+        <button id="cardboard-btn" onclick="toggleCardboardMode()">📱 Cardboard</button>
     </div>
-
-    <!-- Sostituisci la riga Three.js con la versione ES Module -->
-    <!-- <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script> -->
-    <script type="importmap">
-    {
-        "imports": {
-            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
-        }
-    }
-    </script>
-    <script type="module">
-        import * as THREE from 'three';
-        window.THREE = THREE;
-    </script>
     
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- MediaPipe Hands -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    
+    <!-- TensorFlow.js (opzionale per ottimizzazioni) -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    
+    <!-- Utilità mobile -->
+    <script src="js/mobile-utils.js"></script>
+    
+    <!-- App principale -->
     <script src="js/ar-app.js"></script>
     
-    <!-- Rimuovi temporaneamente il Service Worker -->
-    <!-- <script>
+    <!-- Service Worker Registration -->
+    <script>
+        // Registrazione Service Worker per PWA
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js');
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then((registration) => {
+                        console.log('SW registered: ', registration);
+                        
+                        // Controlla aggiornamenti
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    // Nuovo contenuto disponibile
+                                    if (confirm('Nuova versione disponibile. Ricaricare?')) {
+                                        window.location.reload();
+                                    }
+                                }
+                            });
+                        });
+                    })
+                    .catch((registrationError) => {
+                        console.log('SW registration failed: ', registrationError);
+                    });
+            });
         }
-    </script> -->
+        
+        // PWA Install Prompt
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            
+            // Mostra pulsante di installazione personalizzato
+            const installBtn = document.createElement('button');
+            installBtn.textContent = '📱 Installa App';
+            installBtn.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 1000;
+                background: #4CAF50;
+                color: white;
+                border: none;
+                padding: 10px 15px;
+                border-radius: 20px;
+                font-size: 12px;
+                cursor: pointer;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            `;
+            
+            installBtn.addEventListener('click', async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    console.log(`User response to the install prompt: ${outcome}`);
+                    deferredPrompt = null;
+                    installBtn.remove();
+                }
+            });
+            
+            document.body.appendChild(installBtn);
+            
+            // Rimuovi dopo 10 secondi se non cliccato
+            setTimeout(() => {
+                if (installBtn.parentNode) {
+                    installBtn.remove();
+                }
+            }, 10000);
+        });
+        
+        // Gestione installazione completata
+        window.addEventListener('appinstalled', (evt) => {
+            console.log('App installata con successo');
+            // Vibrazione di conferma
+            if ('vibrate' in navigator) {
+                navigator.vibrate([100, 50, 100]);
+            }
+        });
+        
+        // Gestione orientamento per Cardboard
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => {
+                if (window.arApp && window.arApp.isCardboardMode) {
+                    window.arApp.onWindowResize();
+                }
+            }, 100);
+        });
+        
+        // Prevenzione accidentale di uscita dall'app
+        window.addEventListener('beforeunload', (e) => {
+            if (window.arApp && window.arApp.isCardboardMode) {
+                e.preventDefault();
+                e.returnValue = '';
+                return '';
+            }
+        });
+    </script>
 </body>
 </html>

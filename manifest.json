@@ -1,0 +1,102 @@
+{
+  "name": "AR Mobile Cardboard Experience",
+  "short_name": "AR Mobile",
+  "description": "Esperienza di realtà aumentata mobile con supporto Google Cardboard e riconoscimento mani",
+  "version": "1.0.0",
+  "start_url": "/index.html",
+  "display": "fullscreen",
+  "orientation": "any",
+  "theme_color": "#000000",
+  "background_color": "#000000",
+  "scope": "/",
+  "lang": "it",
+  "categories": ["entertainment", "games", "utilities"],
+  "icons": [
+    {
+      "src": "icons/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "screenshots/mobile-ar-1.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Esperienza AR normale"
+    },
+    {
+      "src": "screenshots/cardboard-mode.png",
+      "sizes": "844x390",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Modalità Cardboard stereoscopica"
+    }
+  ],
+  "features": [
+    "camera",
+    "webgl",
+    "devicemotion",
+    "deviceorientation",
+    "fullscreen"
+  ],
+  "permissions": [
+    "camera",
+    "accelerometer",
+    "gyroscope",
+    "magnetometer"
+  ],
+  "prefer_related_applications": false,
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
+  "handle_links": "preferred",
+  "capture_links": "existing-client-navigate"
+}

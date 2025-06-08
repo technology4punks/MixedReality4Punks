@@ -1,0 +1,100 @@
+{
+  "name": "ar-mobile-cardboard",
+  "version": "1.0.0",
+  "description": "Web application mobile all'avanguardia per realtà aumentata con supporto Google Cardboard e riconoscimento mani",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "serve": "python3 -m http.server 8000",
+    "serve-php": "php -S localhost:8000",
+    "build": "echo 'No build step required - static files'",
+    "test": "echo 'No tests specified'",
+    "lint": "eslint js/*.js",
+    "format": "prettier --write *.html js/*.js css/*.css",
+    "validate": "html-validate index.html",
+    "lighthouse": "lighthouse https://localhost:8443 --output html --output-path ./lighthouse-report.html",
+    "pwa-check": "pwa-asset-generator --help",
+    "icons": "pwa-asset-generator icons/logo.svg icons/ --manifest manifest.json",
+    "deploy": "echo 'Deploy to your preferred hosting service'"
+  },
+  "keywords": [
+    "ar",
+    "augmented-reality",
+    "mobile",
+    "cardboard",
+    "vr",
+    "three.js",
+    "mediapipe",
+    "hands",
+    "webgl",
+    "pwa",
+    "webrtc",
+    "camera",
+    "gesture",
+    "3d",
+    "stereoscopic"
+  ],
+  "author": "AR Mobile Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/ar-mobile-cardboard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/ar-mobile-cardboard/issues"
+  },
+  "homepage": "https://github.com/your-username/ar-mobile-cardboard#readme",
+  "dependencies": {
+    "express": "^4.18.2",
+    "compression": "^1.7.4",
+    "selfsigned": "^2.1.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "eslint": "^8.50.0",
+    "prettier": "^3.0.3",
+    "html-validate": "^8.5.0",
+    "lighthouse": "^11.0.0",
+    "pwa-asset-generator": "^6.3.1"
+  },
+  "engines": {
+    "node": ">=14.0.0",
+    "npm": ">=6.0.0"
+  },
+  "browserslist": [
+    "last 2 Chrome versions",
+    "last 2 Firefox versions",
+    "last 2 Safari versions",
+    "last 2 Edge versions",
+    "iOS >= 13",
+    "Android >= 8"
+  ],
+  "pwa": {
+    "name": "AR Mobile Cardboard Experience",
+    "short_name": "AR Mobile",
+    "theme_color": "#000000",
+    "background_color": "#000000",
+    "display": "fullscreen",
+    "orientation": "any",
+    "scope": "/",
+    "start_url": "/"
+  },
+  "config": {
+    "port": 8443,
+    "http_port": 8080
+  },
+  "files": [
+    "index.html",
+    "manifest.json",
+    "sw.js",
+    "css/",
+    "js/",
+    "icons/",
+    "README.md"
+  ],
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  }
+}
