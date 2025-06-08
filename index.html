@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <meta name="description" content="Esperienza di realtà aumentata mobile con supporto Google Cardboard e riconoscimento mani">
-    <meta name="keywords" content="AR, realtà aumentata, mobile, cardboard, VR, mani, three.js">
+    <meta name="description" content="Esperienza di realtà aumentata mobile con A-Frame e riconoscimento mani">
+    <meta name="keywords" content="AR, realtà aumentata, mobile, cardboard, VR, mani, aframe">
     <meta name="author" content="AR Mobile Team">
     
     <!-- PWA Meta Tags -->
@@ -30,8 +30,12 @@
     <link rel="apple-touch-icon" sizes="60x60" href="icons/icon-60.png">
     <link rel="apple-touch-icon" sizes="57x57" href="icons/icon-57.png">
     
-    <title>AR Mobile Cardboard Experience</title>
-    <link rel="stylesheet" href="css/mobile-ar.css">
+    <title>AR Mobile A-Frame Experience</title>
+    
+    <!-- A-Frame -->
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v6.1.1/dist/aframe-extras.min.js"></script>
+    
     <style>
         * {
             margin: 0;
@@ -46,48 +50,34 @@
             touch-action: none;
         }
         
-        #container {
-            position: relative;
-            width: 100vw;
-            height: 100vh;
-        }
-        
-        #video {
-            position: absolute;
+        #video-background {
+            position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
             object-fit: cover;
-            z-index: 1;
-        }
-        
-        #canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 2;
+            z-index: -1;
         }
         
         #controls {
-            position: absolute;
+            position: fixed;
             top: 20px;
             left: 20px;
-            z-index: 10;
+            z-index: 1000;
             color: white;
             background: rgba(0,0,0,0.7);
             padding: 10px;
             border-radius: 5px;
             font-size: 14px;
+            pointer-events: auto;
         }
         
         #cardboard-btn {
-            position: absolute;
+            position: fixed;
             bottom: 20px;
             right: 20px;
-            z-index: 10;
+            z-index: 1000;
             background: #ff4444;
             color: white;
             border: none;
@@ -96,52 +86,129 @@
             font-size: 16px;
             cursor: pointer;
             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            pointer-events: auto;
         }
         
         #loading {
-            position: absolute;
+            position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
             color: white;
             font-size: 18px;
-            z-index: 5;
+            z-index: 1000;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 10px;
         }
         
-        .stereo-view {
-            display: flex;
+        .instructions-overlay {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            z-index: 1000;
+            text-align: center;
+            max-width: 80%;
         }
         
-        .eye {
-            width: 50%;
+        a-scene {
             height: 100vh;
+            width: 100vw;
+        }
+        
+        .hidden {
+            display: none;
         }
     </style>
 </head>
 <body>
-    <div id="container">
-        <video id="video" autoplay muted playsinline></video>
-        <canvas id="canvas"></canvas>
-        <div id="loading">Caricamento AR Experience...</div>
-        
-        <div class="status-indicator loading" id="status-indicator"></div>
-        
-        <div id="controls">
-            <div>Stato: <span id="status">Inizializzazione...</span></div>
-            <div>Mani rilevate: <span id="hands-count">0</span></div>
-            <div>FPS: <span id="fps">0</span></div>
-            <div>Modalità: <span id="mode">Normale</span></div>
-        </div>
-        
-        <div class="instructions-overlay" id="instructions">
-            Muovi la mano davanti alla camera per interagire con il cubo rosso
-        </div>
-        
-        <button id="cardboard-btn" onclick="toggleCardboardMode()">📱 Cardboard</button>
+    <video id="video-background" autoplay muted playsinline></video>
+    
+    <div id="loading">Caricamento AR Experience...</div>
+    
+    <div id="controls">
+        <div>Stato: <span id="status">Inizializzazione...</span></div>
+        <div>Mani rilevate: <span id="hands-count">0</span></div>
+        <div>FPS: <span id="fps">0</span></div>
+        <div>Modalità: <span id="mode">Normale</span></div>
     </div>
     
-    <!-- Three.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <div class="instructions-overlay" id="instructions">
+        Muovi la mano davanti alla camera per interagire con il cubo rosso
+    </div>
+    
+    <button id="cardboard-btn" onclick="toggleCardboardMode()">📱 Cardboard</button>
+    
+    <!-- A-Frame Scene -->
+    <a-scene 
+        id="scene"
+        embedded 
+        style="height: 100vh; width: 100vw; position: fixed; top: 0; left: 0; z-index: 1;"
+        vr-mode-ui="enabled: true"
+        device-orientation-permission-ui="enabled: false"
+        background="color: transparent"
+        renderer="antialias: true; colorManagement: true; sortObjects: true; physicallyCorrectLights: true; alpha: true"
+        loading-screen="enabled: false">
+        
+        <!-- Assets -->
+        <a-assets>
+            <a-mixin id="cube-material" 
+                     material="color: #ff4444; metalness: 0.2; roughness: 0.8; transparent: true; opacity: 0.9">
+            </a-mixin>
+        </a-assets>
+        
+        <!-- Camera -->
+        <a-camera id="camera" 
+                  position="0 1.6 0" 
+                  look-controls="enabled: true" 
+                  wasd-controls="enabled: false"
+                  cursor="rayOrigin: mouse">
+            <a-cursor 
+                position="0 0 -1"
+                geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
+                material="color: white; shader: flat">
+            </a-cursor>
+        </a-camera>
+        
+        <!-- Interactive Cube -->
+        <a-box id="interactive-cube"
+               mixin="cube-material"
+               position="0 1.5 -2"
+               rotation="0 45 0"
+               scale="0.5 0.5 0.5"
+               animation__rotate="property: rotation; to: 0 405 0; loop: true; dur: 4000; easing: linear"
+               animation__hover="property: scale; to: 0.6 0.6 0.6; startEvents: mouseenter; dur: 200"
+               animation__leave="property: scale; to: 0.5 0.5 0.5; startEvents: mouseleave; dur: 200">
+        </a-box>
+        
+        <!-- Hand Tracking Spheres (will be positioned by JavaScript) -->
+        <a-sphere id="hand-left" 
+                  position="-1 1.5 -1" 
+                  radius="0.05" 
+                  material="color: #00ff00; transparent: true; opacity: 0.8"
+                  visible="false">
+        </a-sphere>
+        
+        <a-sphere id="hand-right" 
+                  position="1 1.5 -1" 
+                  radius="0.05" 
+                  material="color: #0000ff; transparent: true; opacity: 0.8"
+                  visible="false">
+        </a-sphere>
+        
+        <!-- Lighting -->
+        <a-light type="ambient" color="#404040" intensity="0.4"></a-light>
+        <a-light type="directional" position="2 4 2" color="#ffffff" intensity="0.8"></a-light>
+        
+        <!-- Sky (transparent for AR effect) -->
+        <a-sky color="transparent" opacity="0"></a-sky>
+    </a-scene>
     
     <!-- MediaPipe Hands -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
@@ -149,14 +216,220 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
     
-    <!-- TensorFlow.js (opzionale per ottimizzazioni) -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    
     <!-- Utilità mobile -->
     <script src="js/mobile-utils.js"></script>
     
-    <!-- App principale -->
-    <script src="js/ar-app.js"></script>
+    <!-- A-Frame AR App -->
+    <script>
+        class AFrameARApp {
+            constructor() {
+                this.scene = document.querySelector('#scene');
+                this.camera = document.querySelector('#camera');
+                this.cube = document.querySelector('#interactive-cube');
+                this.handLeft = document.querySelector('#hand-left');
+                this.handRight = document.querySelector('#hand-right');
+                this.video = document.querySelector('#video-background');
+                
+                this.isCardboardMode = false;
+                this.hands = null;
+                this.cameraUtils = null;
+                this.lastTime = 0;
+                this.frameCount = 0;
+                
+                this.init();
+            }
+            
+            async init() {
+                try {
+                    await this.setupCamera();
+                    await this.setupHandTracking();
+                    this.setupEventListeners();
+                    this.startAnimation();
+                    
+                    document.getElementById('loading').classList.add('hidden');
+                    document.getElementById('status').textContent = 'Pronto';
+                    
+                    console.log('A-Frame AR App inizializzata con successo');
+                } catch (error) {
+                    console.error('Errore durante l\'inizializzazione:', error);
+                    document.getElementById('status').textContent = 'Errore: ' + error.message;
+                }
+            }
+            
+            async setupCamera() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: 'environment',
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        }
+                    });
+                    
+                    this.video.srcObject = stream;
+                    await this.video.play();
+                    
+                    console.log('Camera inizializzata');
+                } catch (error) {
+                    console.error('Errore camera:', error);
+                    throw new Error('Impossibile accedere alla camera');
+                }
+            }
+            
+            async setupHandTracking() {
+                try {
+                    this.hands = new Hands({
+                        locateFile: (file) => {
+                            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+                        }
+                    });
+                    
+                    this.hands.setOptions({
+                        maxNumHands: 2,
+                        modelComplexity: 1,
+                        minDetectionConfidence: 0.5,
+                        minTrackingConfidence: 0.5
+                    });
+                    
+                    this.hands.onResults((results) => this.onHandResults(results));
+                    
+                    this.cameraUtils = new Camera(this.video, {
+                        onFrame: async () => {
+                            await this.hands.send({ image: this.video });
+                        },
+                        width: 1280,
+                        height: 720
+                    });
+                    
+                    await this.cameraUtils.start();
+                    
+                    console.log('Hand tracking inizializzato');
+                } catch (error) {
+                    console.error('Errore hand tracking:', error);
+                    throw new Error('Impossibile inizializzare il riconoscimento mani');
+                }
+            }
+            
+            onHandResults(results) {
+                const handsCount = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
+                document.getElementById('hands-count').textContent = handsCount;
+                
+                // Nascondi tutte le mani
+                this.handLeft.setAttribute('visible', false);
+                this.handRight.setAttribute('visible', false);
+                
+                if (results.multiHandLandmarks && results.multiHandedness) {
+                    for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+                        const landmarks = results.multiHandLandmarks[i];
+                        const handedness = results.multiHandedness[i];
+                        
+                        // Prendi il landmark del polso (indice 0)
+                        const wrist = landmarks[0];
+                        
+                        // Converti coordinate normalizzate in coordinate 3D
+                        const x = (wrist.x - 0.5) * 4; // Scala e centra
+                        const y = -(wrist.y - 0.5) * 3 + 1.5; // Inverti Y e centra
+                        const z = -2 + (wrist.z || 0) * 2; // Profondità
+                        
+                        const isLeft = handedness.label === 'Left';
+                        const handSphere = isLeft ? this.handLeft : this.handRight;
+                        
+                        handSphere.setAttribute('position', `${x} ${y} ${z}`);
+                        handSphere.setAttribute('visible', true);
+                        
+                        // Interazione con il cubo
+                        this.checkHandCubeInteraction(x, y, z);
+                    }
+                }
+            }
+            
+            checkHandCubeInteraction(handX, handY, handZ) {
+                const cubePos = this.cube.getAttribute('position');
+                const distance = Math.sqrt(
+                    Math.pow(handX - cubePos.x, 2) +
+                    Math.pow(handY - cubePos.y, 2) +
+                    Math.pow(handZ - cubePos.z, 2)
+                );
+                
+                if (distance < 0.5) {
+                    // Cambia colore del cubo quando la mano è vicina
+                    this.cube.setAttribute('material', 'color', '#00ff00');
+                    this.cube.setAttribute('scale', '0.7 0.7 0.7');
+                } else {
+                    this.cube.setAttribute('material', 'color', '#ff4444');
+                    this.cube.setAttribute('scale', '0.5 0.5 0.5');
+                }
+            }
+            
+            setupEventListeners() {
+                // Gestione resize
+                window.addEventListener('resize', () => this.onWindowResize());
+                
+                // Gestione orientamento
+                window.addEventListener('orientationchange', () => {
+                    setTimeout(() => this.onWindowResize(), 100);
+                });
+            }
+            
+            onWindowResize() {
+                // A-Frame gestisce automaticamente il resize
+                console.log('Window resized');
+            }
+            
+            startAnimation() {
+                const animate = (time) => {
+                    // Calcola FPS
+                    if (time - this.lastTime >= 1000) {
+                        const fps = Math.round((this.frameCount * 1000) / (time - this.lastTime));
+                        document.getElementById('fps').textContent = fps;
+                        this.frameCount = 0;
+                        this.lastTime = time;
+                    }
+                    this.frameCount++;
+                    
+                    requestAnimationFrame(animate);
+                };
+                
+                requestAnimationFrame(animate);
+            }
+            
+            toggleCardboardMode() {
+                this.isCardboardMode = !this.isCardboardMode;
+                
+                if (this.isCardboardMode) {
+                    // Entra in modalità VR
+                    this.scene.enterVR();
+                    document.getElementById('mode').textContent = 'Cardboard';
+                    document.getElementById('cardboard-btn').textContent = '👁️ Normale';
+                } else {
+                    // Esci dalla modalità VR
+                    this.scene.exitVR();
+                    document.getElementById('mode').textContent = 'Normale';
+                    document.getElementById('cardboard-btn').textContent = '📱 Cardboard';
+                }
+            }
+        }
+        
+        // Funzione globale per il pulsante Cardboard
+        function toggleCardboardMode() {
+            if (window.arApp) {
+                window.arApp.toggleCardboardMode();
+            }
+        }
+        
+        // Inizializza l'app quando A-Frame è pronto
+        document.addEventListener('DOMContentLoaded', () => {
+            // Aspetta che A-Frame sia completamente caricato
+            const scene = document.querySelector('a-scene');
+            if (scene.hasLoaded) {
+                window.arApp = new AFrameARApp();
+            } else {
+                scene.addEventListener('loaded', () => {
+                    window.arApp = new AFrameARApp();
+                });
+            }
+        });
+    </script>
     
     <!-- Service Worker Registration -->
     <script>

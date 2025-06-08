@@ -228,10 +228,16 @@ class ARMobileApp {
                 console.log(`Renderer WebGL creato con successo (configurazione ${i + 1})`);
             } catch (error) {
                 console.warn(`Configurazione ${i + 1} fallita:`, error.message);
-                if (i === fallbackConfigs.length - 1) {
-                    // Last attempt failed, try Canvas renderer as ultimate fallback
+                 if (i === fallbackConfigs.length - 1) {
+                     // Last attempt failed, create a simple Canvas 2D fallback
+                     console.log('Tentativo con Canvas2D come fallback finale...');
                      try {
-                         console.log('Tentativo con CanvasRenderer come fallback finale...');
+                         // Ensure we can get 2D context
+                         const ctx = this.canvas.getContext('2d');
+                         if (!ctx) {
+                             throw new Error('Canvas 2D context not available');
+                         }
+                         
                          // Create a simple 2D canvas fallback
                          this.renderer = {
                              domElement: this.canvas,
@@ -242,19 +248,22 @@ class ARMobileApp {
                              render: (scene, camera) => {
                                  // Simple 2D fallback rendering
                                  const ctx = this.canvas.getContext('2d');
-                                 ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-                                 ctx.fillStyle = 'rgba(0, 100, 200, 0.3)';
-                                 ctx.fillRect(this.canvas.width/4, this.canvas.height/4, this.canvas.width/2, this.canvas.height/2);
-                                 ctx.fillStyle = 'white';
-                                 ctx.font = '20px Arial';
-                                 ctx.textAlign = 'center';
-                                 ctx.fillText('AR Mode - WebGL non disponibile', this.canvas.width/2, this.canvas.height/2);
+                                 if (ctx) {
+                                     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                                     ctx.fillStyle = 'rgba(0, 100, 200, 0.3)';
+                                     ctx.fillRect(this.canvas.width/4, this.canvas.height/4, this.canvas.width/2, this.canvas.height/2);
+                                     ctx.fillStyle = 'white';
+                                     ctx.font = '20px Arial';
+                                     ctx.textAlign = 'center';
+                                     ctx.fillText('AR Mode - WebGL non disponibile', this.canvas.width/2, this.canvas.height/2);
+                                 }
                              }
                          };
                          this.isCanvas2D = true;
                          rendererCreated = true;
-                         console.log('Canvas 2D fallback creato');
+                         console.log('Canvas 2D fallback creato con successo');
                      } catch (canvasError) {
+                         console.error('Errore creazione Canvas 2D:', canvasError);
                          throw new Error('Nessun renderer supportato su questo dispositivo');
                      }
                 }
