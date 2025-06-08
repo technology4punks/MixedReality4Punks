@@ -147,6 +147,7 @@
     
     <button id="cardboard-btn" onclick="toggleCardboardMode()">📱 Cardboard</button>
     <button id="ar-btn" onclick="toggleARMode()" style="position: fixed; bottom: 20px; left: 20px; z-index: 1000; background: #00ff00; color: white; border: none; padding: 15px 20px; border-radius: 25px; font-size: 16px; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">🌍 AR Mode</button>
+    <button id="debug-btn" onclick="forceDebug()" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; background: #ff9900; color: white; border: none; padding: 15px 20px; border-radius: 25px; font-size: 16px; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">🔍 Debug</button>
     
     <!-- A-Frame Scene -->
     <a-scene 
@@ -755,6 +756,70 @@
             if (window.arApp) {
                 window.arApp.toggleARMode();
             }
+        }
+        
+        async function forceDebug() {
+            console.log('🔍 === INIZIO DEBUG FORZATO ===');
+            
+            // Test 1: Verifica disponibilità API
+            console.log('📱 Test 1: API MediaDevices');
+            console.log('navigator.mediaDevices:', !!navigator.mediaDevices);
+            console.log('getUserMedia:', !!navigator.mediaDevices?.getUserMedia);
+            
+            // Test 2: Verifica MediaPipe
+            console.log('👋 Test 2: MediaPipe');
+            console.log('window.mediaPipeReady:', window.mediaPipeReady);
+            console.log('typeof Hands:', typeof Hands);
+            console.log('typeof Camera:', typeof Camera);
+            
+            // Test 3: Verifica elementi DOM
+            console.log('🎬 Test 3: Elementi DOM');
+            console.log('video element:', !!document.querySelector('#video-background'));
+            console.log('scene element:', !!document.querySelector('#scene'));
+            console.log('hand-left element:', !!document.querySelector('#hand-left'));
+            console.log('hand-right element:', !!document.querySelector('#hand-right'));
+            
+            // Test 4: Test fotocamera manuale
+            console.log('📷 Test 4: Fotocamera manuale');
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                console.log('✅ Fotocamera accessibile:', stream.getVideoTracks().length, 'tracks');
+                
+                const video = document.querySelector('#video-background');
+                video.srcObject = stream;
+                await video.play();
+                console.log('✅ Video avviato manualmente');
+                
+                // Mostra il video
+                video.style.display = 'block';
+                video.style.position = 'fixed';
+                video.style.top = '0';
+                video.style.left = '0';
+                video.style.width = '100%';
+                video.style.height = '100%';
+                video.style.objectFit = 'cover';
+                video.style.zIndex = '-1';
+                
+                document.getElementById('status').textContent = 'Debug: Fotocamera attiva';
+            } catch (error) {
+                console.error('❌ Errore fotocamera manuale:', error);
+                document.getElementById('status').textContent = 'Debug: Errore fotocamera - ' + error.message;
+            }
+            
+            // Test 5: Test MediaPipe manuale
+            if (typeof Hands !== 'undefined') {
+                console.log('👋 Test 5: MediaPipe manuale');
+                try {
+                    const hands = new Hands({
+                        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+                    });
+                    console.log('✅ Istanza MediaPipe creata');
+                } catch (error) {
+                    console.error('❌ Errore MediaPipe manuale:', error);
+                }
+            }
+            
+            console.log('🔍 === FINE DEBUG FORZATO ===');
         }
         
         // Inizializza l'app quando A-Frame è pronto
