@@ -229,7 +229,7 @@
         <a-light type="directional" position="2 4 2" color="#ffffff" intensity="0.8"></a-light>
         
         <!-- Sky (transparent for AR effect) -->
-        <a-sky color="transparent" opacity="0"></a-sky>
+        <a-sky color="#000000" opacity="0"></a-sky>
     </a-scene>
     
     <!-- MediaPipe Hands -->
@@ -554,31 +554,31 @@
     
     <!-- Service Worker Registration -->
     <script>
-        // Registrazione Service Worker per PWA
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then((registration) => {
-                        console.log('SW registered: ', registration);
-                        
-                        // Controlla aggiornamenti
-                        registration.addEventListener('updatefound', () => {
-                            const newWorker = registration.installing;
-                            newWorker.addEventListener('statechange', () => {
-                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    // Nuovo contenuto disponibile
-                                    if (confirm('Nuova versione disponibile. Ricaricare?')) {
-                                        window.location.reload();
-                                    }
-                                }
-                            });
-                        });
-                    })
-                    .catch((registrationError) => {
-                        console.log('SW registration failed: ', registrationError);
-                    });
-            });
-        }
+        // Registrazione Service Worker per PWA (temporaneamente disabilitata)
+        // if ('serviceWorker' in navigator) {
+        //     window.addEventListener('load', () => {
+        //         navigator.serviceWorker.register('/sw.js')
+        //             .then((registration) => {
+        //                 console.log('SW registered: ', registration);
+        //                 
+        //                 // Controlla aggiornamenti
+        //                 registration.addEventListener('updatefound', () => {
+        //                     const newWorker = registration.installing;
+        //                     newWorker.addEventListener('statechange', () => {
+        //                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+        //                             // Nuovo contenuto disponibile
+        //                             if (confirm('Nuova versione disponibile. Ricaricare?')) {
+        //                                 window.location.reload();
+        //                             }
+        //                         }
+        //                     });
+        //                 });
+        //             })
+        //             .catch((registrationError) => {
+        //                 console.log('SW registration failed: ', registrationError);
+        //             });
+        //     });
+        // }
         
         // PWA Install Prompt
         let deferredPrompt;
