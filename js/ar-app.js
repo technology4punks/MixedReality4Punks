@@ -116,6 +116,7 @@ class ARMobileApp {
     async init() {
         try {
             // Inizializza utilità mobile
+            this.mobileUtils = new MobileUtils();
             this.deviceInfo = MobileUtils.optimizeForDevice();
             this.performanceMonitor = MobileUtils.measurePerformance();
             this.performanceMonitor.start();
@@ -133,7 +134,7 @@ class ARMobileApp {
             
             // Prevenire standby
             try {
-                this.wakeLock = await MobileUtils.preventSleep();
+                this.wakeLock = await this.mobileUtils.preventSleep();
             } catch (e) {
                 console.warn('Wake lock non supportato:', e);
             }
@@ -192,12 +193,13 @@ class ARMobileApp {
         this.camera.position.z = 5;
         
         // Renderer with error handling
+        const isLowEnd = this.deviceInfo && this.deviceInfo.isLowEndDevice;
         try {
             this.renderer = new THREE.WebGLRenderer({ 
                 canvas: this.canvas,
                 alpha: true,
-                antialias: this.mobileUtils.isLowEndDevice() ? false : true,
-                powerPreference: this.mobileUtils.isLowEndDevice() ? 'low-power' : 'high-performance'
+                antialias: isLowEnd ? false : true,
+                powerPreference: isLowEnd ? 'low-power' : 'high-performance'
             });
         } catch (error) {
             console.warn('WebGL not supported, trying fallback options:', error);
@@ -280,7 +282,7 @@ class ARMobileApp {
             this.canvas.classList.add('hand-detected');
             
             // Vibrazione leggera per feedback
-            MobileUtils.vibrate([50]);
+            this.mobileUtils.vibrate([50]);
             
             // Nascondi istruzioni quando le mani sono rilevate
             this.instructionsOverlay.classList.add('hidden');
@@ -407,14 +409,14 @@ class ARMobileApp {
         
         // Forza orientamento landscape e fullscreen
         try {
-            MobileUtils.lockOrientation('landscape');
-            MobileUtils.requestFullscreen();
+            this.mobileUtils.lockOrientation('landscape');
+        this.mobileUtils.requestFullscreen();
         } catch (e) {
             console.warn('Impossibile bloccare orientamento o attivare fullscreen:', e);
         }
         
         // Vibrazione per conferma
-        MobileUtils.vibrate([100, 50, 100]);
+        this.mobileUtils.vibrate([100, 50, 100]);
     }
     
     disableCardboardMode() {
@@ -430,14 +432,14 @@ class ARMobileApp {
         
         // Sblocca orientamento ed esci da fullscreen
         try {
-            MobileUtils.unlockOrientation();
-            MobileUtils.exitFullscreen();
+            this.mobileUtils.unlockOrientation();
+        this.mobileUtils.exitFullscreen();
         } catch (e) {
             console.warn('Impossibile sbloccare orientamento o uscire da fullscreen:', e);
         }
         
         // Vibrazione per conferma
-        MobileUtils.vibrate([50]);
+        this.mobileUtils.vibrate([50]);
     }
     
     renderStereo() {
