@@ -232,11 +232,53 @@
         <a-sky color="#000000" opacity="0"></a-sky>
     </a-scene>
     
-    <!-- MediaPipe Hands -->
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <!-- MediaPipe Hands con fallback -->
+    <script>
+        // Funzione per caricare script con fallback
+        function loadScriptWithFallback(src, fallbackSrc) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = () => {
+                    console.log('✅ Script caricato:', src);
+                    resolve();
+                };
+                script.onerror = () => {
+                    console.warn('⚠️ Fallback per script:', src);
+                    if (fallbackSrc) {
+                        const fallbackScript = document.createElement('script');
+                        fallbackScript.src = fallbackSrc;
+                        fallbackScript.onload = () => {
+                            console.log('✅ Fallback script caricato:', fallbackSrc);
+                            resolve();
+                        };
+                        fallbackScript.onerror = () => {
+                            console.error('❌ Errore caricamento script:', fallbackSrc);
+                            reject(new Error('Script loading failed'));
+                        };
+                        document.head.appendChild(fallbackScript);
+                    } else {
+                        reject(new Error('Script loading failed'));
+                    }
+                };
+                document.head.appendChild(script);
+            });
+        }
+        
+        // Carica MediaPipe scripts
+        Promise.all([
+            loadScriptWithFallback('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js'),
+            loadScriptWithFallback('https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js'),
+            loadScriptWithFallback('https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js'),
+            loadScriptWithFallback('https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js')
+        ]).then(() => {
+            console.log('🎉 Tutti gli script MediaPipe caricati');
+            window.mediaPipeReady = true;
+        }).catch(error => {
+            console.error('❌ Errore caricamento MediaPipe:', error);
+            window.mediaPipeReady = false;
+        });
+    </script>
     
     <!-- Utilità mobile -->
     <script src="js/mobile-utils.js"></script>
@@ -295,7 +337,16 @@
             }
             
             async setupCamera() {
+                console.log('📷 Inizializzazione camera...');
+                
                 try {
+                    // Verifica disponibilità API
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        throw new Error('API MediaDevices non supportata');
+                    }
+                    
+                    console.log('📱 Richiesta permessi camera...');
+                    
                     // Prova prima la camera posteriore con impostazioni ottimizzate per mobile
                     const constraints = {
                         video: {
@@ -306,37 +357,71 @@
                         }
                     };
                     
+                    console.log('📸 Tentativo camera posteriore con impostazioni ottimali:', constraints);
+                    
                     let stream;
                     try {
                         stream = await navigator.mediaDevices.getUserMedia(constraints);
+                        console.log('✅ Camera posteriore ottimale ottenuta');
                     } catch (exactError) {
-                        console.warn('Camera posteriore esatta non disponibile, provo con fallback');
-                        // Fallback se la camera posteriore esatta non è disponibile
-                        const fallbackConstraints = {
-                            video: {
-                                facingMode: 'environment',
-                                width: { ideal: 1280 },
-                                height: { ideal: 720 }
-                            }
-                        };
-                        stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+                        console.warn('⚠️ Camera posteriore esatta non disponibile:', exactError.message);
+                        console.log('📸 Tentativo con fallback 1: camera posteriore base');
+                        
+                        // Fallback 1: camera posteriore senza exact
+                        try {
+                            const fallbackConstraints1 = {
+                                video: {
+                                    facingMode: 'environment',
+                                    width: { ideal: 1280 },
+                                    height: { ideal: 720 }
+                                }
+                            };
+                            stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints1);
+                            console.log('✅ Camera posteriore base ottenuta');
+                        } catch (fallback1Error) {
+                            console.warn('⚠️ Fallback 1 fallito:', fallback1Error.message);
+                            console.log('📸 Tentativo con fallback 2: qualsiasi camera');
+                            
+                            // Fallback 2: qualsiasi camera
+                            const fallbackConstraints2 = {
+                                video: true
+                            };
+                            stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints2);
+                            console.log('✅ Camera generica ottenuta');
+                        }
                     }
                     
+                    console.log('▶️ Avvio stream video...');
                     this.video.srcObject = stream;
+                    
+                    // Attendi che il video sia pronto
+                    await new Promise((resolve) => {
+                        this.video.onloadedmetadata = () => {
+                            console.log('✅ Metadata video caricati');
+                            resolve();
+                        };
+                    });
+                    
                     await this.video.play();
+                    console.log('✅ Video avviato');
                     
                     // Log delle capacità della camera
                     const track = stream.getVideoTracks()[0];
                     const settings = track.getSettings();
-                    console.log('Camera inizializzata:', {
-                        facingMode: settings.facingMode,
+                    console.log('📊 Camera inizializzata:', {
+                        label: track.label,
+                        facingMode: settings.facingMode || 'non specificato',
                         width: settings.width,
                         height: settings.height,
                         frameRate: settings.frameRate
                     });
+                    
+                    return true;
                 } catch (error) {
-                    console.error('Errore camera:', error);
-                    throw new Error('Impossibile accedere alla camera posteriore');
+                    console.error('❌ Errore camera:', error);
+                    console.error('Stack trace:', error.stack);
+                    document.getElementById('status').textContent = 'Errore camera: ' + error.message;
+                    throw new Error('Impossibile accedere alla camera: ' + error.message);
                 }
             }
             
@@ -346,7 +431,9 @@
                     
                     // Verifica disponibilità MediaPipe
                     if (typeof Hands === 'undefined') {
-                        throw new Error('MediaPipe Hands non disponibile');
+                        console.warn('⚠️ MediaPipe Hands non disponibile, disabilito hand tracking');
+                        document.getElementById('status').textContent = 'Hand tracking disabilitato';
+                        return; // Non lanciare errore, continua senza hand tracking
                     }
                     
                     this.hands = new Hands({
@@ -557,7 +644,7 @@
                 }
             }
             
-            toggleARMode() {
+            async toggleARMode() {
                 console.log('🔄 Toggle AR Mode - Stato attuale:', this.isARMode);
                 
                 this.isARMode = !this.isARMode;
@@ -585,19 +672,49 @@
                         console.log('✅ Scena AR configurata');
                     }
                     
-                    // Rendi il video visibile come sfondo
-                    console.log('📹 Configurazione video background...');
-                    this.video.style.display = 'block';
-                    this.video.style.position = 'fixed';
-                    this.video.style.top = '0';
-                    this.video.style.left = '0';
-                    this.video.style.width = '100%';
-                    this.video.style.height = '100%';
-                    this.video.style.objectFit = 'cover';
-                    this.video.style.zIndex = '-1';
-                    console.log('✅ Video background configurato');
-                    
-                    document.getElementById('status').textContent = 'AR Mode Attivo';
+                    try {
+                        // Riavvia la fotocamera con impostazioni AR
+                        console.log('📹 Riavvio fotocamera per AR...');
+                        
+                        // Ferma la fotocamera corrente se attiva
+                        if (this.video.srcObject) {
+                            const tracks = this.video.srcObject.getTracks();
+                            tracks.forEach(track => track.stop());
+                        }
+                        
+                        // Riavvia con impostazioni ottimizzate per AR
+                        await this.setupCamera();
+                        
+                        // Rendi il video visibile come sfondo
+                        console.log('📹 Configurazione video background...');
+                        this.video.style.display = 'block';
+                        this.video.style.position = 'fixed';
+                        this.video.style.top = '0';
+                        this.video.style.left = '0';
+                        this.video.style.width = '100%';
+                        this.video.style.height = '100%';
+                        this.video.style.objectFit = 'cover';
+                        this.video.style.zIndex = '-1';
+                        console.log('✅ Video background configurato');
+                        
+                        // Riavvia il tracking delle mani
+                        if (this.cameraUtils) {
+                            console.log('🔄 Riavvio Camera utils...');
+                            await this.cameraUtils.start();
+                        }
+                        
+                        document.getElementById('status').textContent = 'AR Mode Attivo';
+                    } catch (error) {
+                        console.error('❌ Errore attivazione AR:', error);
+                        document.getElementById('status').textContent = 'Errore AR: ' + error.message;
+                        
+                        // Ripristina stato precedente
+                        this.isARMode = false;
+                        if (arButton) {
+                            arButton.textContent = 'AR Mode';
+                            arButton.style.backgroundColor = '#4CAF50';
+                        }
+                    }
                 } else {
                     console.log('❌ Disattivazione modalità AR...');
                     
@@ -642,13 +759,32 @@
         
         // Inizializza l'app quando A-Frame è pronto
         document.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 DOM caricato, inizializzazione app...');
+            
+            function initializeApp() {
+                console.log('🎬 Inizializzazione A-Frame AR App...');
+                
+                // Verifica che MediaPipe sia caricato
+                if (window.mediaPipeReady === false) {
+                    console.error('❌ MediaPipe non disponibile, modalità limitata');
+                    document.getElementById('status').textContent = 'MediaPipe non disponibile';
+                } else if (window.mediaPipeReady === undefined) {
+                    console.log('⏳ Attendo caricamento MediaPipe...');
+                    setTimeout(initializeApp, 500);
+                    return;
+                }
+                
+                window.arApp = new AFrameARApp();
+            }
+            
             // Aspetta che A-Frame sia completamente caricato
             const scene = document.querySelector('a-scene');
             if (scene.hasLoaded) {
-                window.arApp = new AFrameARApp();
+                initializeApp();
             } else {
                 scene.addEventListener('loaded', () => {
-                    window.arApp = new AFrameARApp();
+                    console.log('✅ A-Frame scene caricata');
+                    initializeApp();
                 });
             }
         });
