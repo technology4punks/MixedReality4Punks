@@ -116,7 +116,6 @@ class ARMobileApp {
     async init() {
         try {
             // Inizializza utilità mobile
-            this.mobileUtils = new MobileUtils();
             this.deviceInfo = MobileUtils.optimizeForDevice();
             this.performanceMonitor = MobileUtils.measurePerformance();
             this.performanceMonitor.start();
@@ -134,7 +133,7 @@ class ARMobileApp {
             
             // Prevenire standby
             try {
-                this.wakeLock = await this.mobileUtils.preventSleep();
+                this.wakeLock = await MobileUtils.preventSleep();
             } catch (e) {
                 console.warn('Wake lock non supportato:', e);
             }
@@ -282,7 +281,7 @@ class ARMobileApp {
             this.canvas.classList.add('hand-detected');
             
             // Vibrazione leggera per feedback
-            this.mobileUtils.vibrate([50]);
+            MobileUtils.vibrate([50]);
             
             // Nascondi istruzioni quando le mani sono rilevate
             this.instructionsOverlay.classList.add('hidden');
@@ -409,14 +408,14 @@ class ARMobileApp {
         
         // Forza orientamento landscape e fullscreen
         try {
-            this.mobileUtils.lockOrientation('landscape');
-        this.mobileUtils.requestFullscreen();
+            MobileUtils.lockOrientation('landscape');
+        MobileUtils.requestFullscreen();
         } catch (e) {
             console.warn('Impossibile bloccare orientamento o attivare fullscreen:', e);
         }
         
         // Vibrazione per conferma
-        this.mobileUtils.vibrate([100, 50, 100]);
+        MobileUtils.vibrate([100, 50, 100]);
     }
     
     disableCardboardMode() {
@@ -432,14 +431,14 @@ class ARMobileApp {
         
         // Sblocca orientamento ed esci da fullscreen
         try {
-            this.mobileUtils.unlockOrientation();
-        this.mobileUtils.exitFullscreen();
+            MobileUtils.unlockOrientation();
+        MobileUtils.exitFullscreen();
         } catch (e) {
             console.warn('Impossibile sbloccare orientamento o uscire da fullscreen:', e);
         }
         
         // Vibrazione per conferma
-        this.mobileUtils.vibrate([50]);
+        MobileUtils.vibrate([50]);
     }
     
     renderStereo() {
