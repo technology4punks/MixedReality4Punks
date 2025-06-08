@@ -229,29 +229,50 @@ class ARMobileApp {
             } catch (error) {
                 console.warn(`Configurazione ${i + 1} fallita:`, error.message);
                 if (i === fallbackConfigs.length - 1) {
-                    // Last attempt failed, try CSS3D renderer as ultimate fallback
-                    try {
-                        console.log('Tentativo con CSS3DRenderer come fallback finale...');
-                        this.renderer = new THREE.CSS3DRenderer({ element: this.canvas });
-                        this.isCSS3D = true;
-                        rendererCreated = true;
-                        console.log('CSS3DRenderer creato come fallback');
-                    } catch (css3dError) {
-                        throw new Error('Nessun renderer 3D supportato su questo dispositivo');
-                    }
+                    // Last attempt failed, try Canvas renderer as ultimate fallback
+                     try {
+                         console.log('Tentativo con CanvasRenderer come fallback finale...');
+                         // Create a simple 2D canvas fallback
+                         this.renderer = {
+                             domElement: this.canvas,
+                             setSize: (width, height) => {
+                                 this.canvas.width = width;
+                                 this.canvas.height = height;
+                             },
+                             render: (scene, camera) => {
+                                 // Simple 2D fallback rendering
+                                 const ctx = this.canvas.getContext('2d');
+                                 ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                                 ctx.fillStyle = 'rgba(0, 100, 200, 0.3)';
+                                 ctx.fillRect(this.canvas.width/4, this.canvas.height/4, this.canvas.width/2, this.canvas.height/2);
+                                 ctx.fillStyle = 'white';
+                                 ctx.font = '20px Arial';
+                                 ctx.textAlign = 'center';
+                                 ctx.fillText('AR Mode - WebGL non disponibile', this.canvas.width/2, this.canvas.height/2);
+                             }
+                         };
+                         this.isCanvas2D = true;
+                         rendererCreated = true;
+                         console.log('Canvas 2D fallback creato');
+                     } catch (canvasError) {
+                         throw new Error('Nessun renderer supportato su questo dispositivo');
+                     }
                 }
             }
         }
-        if (!this.isCSS3D) {
-            this.renderer.setSize(window.innerWidth, window.innerHeight);
-            this.renderer.setClearColor(0x000000, 0); // Trasparente per AR
-        } else {
-            // CSS3D renderer setup
-            this.renderer.setSize(window.innerWidth, window.innerHeight);
-            this.renderer.domElement.style.position = 'absolute';
-            this.renderer.domElement.style.top = '0';
-            this.renderer.domElement.style.pointerEvents = 'none';
-        }
+        if (!this.isCanvas2D) {
+             this.renderer.setSize(window.innerWidth, window.innerHeight);
+             if (this.renderer.setClearColor) {
+                 this.renderer.setClearColor(0x000000, 0); // Trasparente per AR
+             }
+         } else {
+             // Canvas 2D fallback setup
+             this.renderer.setSize(window.innerWidth, window.innerHeight);
+             this.renderer.domElement.style.position = 'absolute';
+             this.renderer.domElement.style.top = '0';
+             this.renderer.domElement.style.left = '0';
+             this.renderer.domElement.style.zIndex = '1';
+         }
         
         // Luci
         const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
@@ -523,7 +544,9 @@ class ARMobileApp {
         if (this.isCardboardMode) {
             this.renderStereo();
         } else {
-            this.renderer.render(this.scene, this.camera);
+            if (this.renderer && this.renderer.render) {
+                this.renderer.render(this.scene, this.camera);
+            }
         }
     }
 }
