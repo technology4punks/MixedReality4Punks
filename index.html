@@ -131,7 +131,7 @@
     </style>
 </head>
 <body>
-    <video id="video-background" autoplay muted playsinline></video>
+    <video id="video-background" autoplay muted playsinline style="display:none;"></video>
     
     <div id="loading">Caricamento AR Experience...</div>
     
@@ -147,92 +147,26 @@
     </div>
     
     <button id="cardboard-btn" onclick="toggleCardboardMode()">📱 Cardboard</button>
-    <button id="ar-btn" onclick="toggleARMode()" style="position: fixed; bottom: 20px; left: 20px; z-index: 1000; background: #00ff00; color: white; border: none; padding: 15px 20px; border-radius: 25px; font-size: 16px; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">🌍 AR Mode</button>
+    <button id="ar-btn" onclick="activateAR()" style="position: fixed; bottom: 20px; left: 20px; z-index: 1000; background: #00ff00; color: white; border: none; padding: 15px 20px; border-radius: 25px; font-size: 16px; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">🌍 AR Mode</button>
     <button id="debug-btn" onclick="forceDebug()" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; background: #ff9900; color: white; border: none; padding: 15px 20px; border-radius: 25px; font-size: 16px; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">🔍 Debug</button>
     
-    <!-- A-Frame Scene -->
-    <a-scene 
-        id="scene"
-        embedded 
-        style="height: 100vh; width: 100vw; position: fixed; top: 0; left: 0; z-index: 1;"
-        vr-mode-ui="enabled: true"
-        ar-mode-ui="enabled: true"
-        device-orientation-permission-ui="enabled: false"
-        background="color: transparent"
-        renderer="antialias: true; colorManagement: true; sortObjects: true; physicallyCorrectLights: true; alpha: true"
-        loading-screen="enabled: false"
-        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;">
-        
-        <!-- Assets -->
-        <a-assets>
-            <a-mixin id="cube-material" 
-                     material="color: #ff4444; metalness: 0.2; roughness: 0.8; transparent: true; opacity: 0.9">
-            </a-mixin>
-        </a-assets>
-        
-        <!-- Camera -->
-        <a-camera id="camera" 
-                  position="0 1.6 0" 
-                  look-controls="enabled: true" 
-                  wasd-controls="enabled: false"
-                  cursor="rayOrigin: mouse"
-                  raycaster="objects: [data-raycastable]">
-            <a-cursor 
-                position="0 0 -1"
-                geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
-                material="color: white; shader: flat"
-                raycaster="objects: [data-raycastable]">
-            </a-cursor>
-        </a-camera>
-        
-        <!-- Interactive Cube -->
-        <a-box id="interactive-cube"
-               mixin="cube-material"
-               position="0 1.5 -2"
-               rotation="0 45 0"
-               scale="0.5 0.5 0.5"
-               data-raycastable
-               animation__rotate="property: rotation; to: 0 405 0; loop: true; dur: 4000; easing: linear"
-               animation__hover="property: scale; to: 0.6 0.6 0.6; startEvents: mouseenter; dur: 200"
-               animation__leave="property: scale; to: 0.5 0.5 0.5; startEvents: mouseleave; dur: 200">
-        </a-box>
-        
-        <!-- Hand Tracking Avatars -->
-        <a-entity id="hand-left" visible="false">
-            <!-- Palm -->
-            <a-sphere position="0 0 0" radius="0.08" material="color: #ffdbac; metalness: 0.1; roughness: 0.9"></a-sphere>
-            <!-- Fingers -->
-            <a-cylinder id="finger-left-1" position="0.06 0.02 0.08" radius="0.015" height="0.12" rotation="15 0 0" material="color: #ffdbac; metalness: 0.1; roughness: 0.9"></a-cylinder>
-            <a-cylinder id="finger-left-2" position="0.02 0.02 0.1" radius="0.015" height="0.14" rotation="5 0 0" material="color: #ffdbac; metalness: 0.1; roughness: 0.9"></a-cylinder>
-            <a-cylinder id="finger-left-3" position="-0.02 0.02 0.1" radius="0.015" height="0.13" rotation="-5 0 0" material="color: #ffdbac; metalness: 0.1; roughness: 0.9"></a-cylinder>
-            <a-cylinder id="finger-left-4" position="-0.06 0.02 0.08" radius="0.015" height="0.11" rotation="-15 0 0" material="color: #ffdbac; metalness: 0.1; roughness: 0.9"></a-cylinder>
-            <!-- Thumb -->
-            <a-cylinder id="thumb-left" position="0.08 0 0.02" radius="0.018" height="0.1" rotation="0 0 45" material="color: #ffdbac; metalness: 0.1; roughness: 0.9"></a-cylinder>
-            <!-- Glow effect -->
-            <a-sphere position="0 0 0" radius="0.12" material="color: #00ff00; transparent: true; opacity: 0.3; shader: flat"></a-sphere>
-        </a-entity>
-        
-        <a-entity id="hand-right" visible="false">
-            <!-- Palm -->
-            <a-sphere position="0 0 0" radius="0.08" material="color: #ffdbac; metalness: 0.1; roughness: 0.9"></a-sphere>
-            <!-- Fingers -->
-            <a-cylinder id="finger-right-1" position="-0.06 0.02 0.08" radius="0.015" height="0.12" rotation="15 0 0" material="color: #ffdbac; metalness: 0.1; roughness: 0.9"></a-cylinder>
-            <a-cylinder id="finger-right-2" position="-0.02 0.02 0.1" radius="0.015" height="0.14" rotation="5 0 0" material="color: #ffdbac; metalness: 0.1; roughness: 0.9"></a-cylinder>
-            <a-cylinder id="finger-right-3" position="0.02 0.02 0.1" radius="0.015" height="0.13" rotation="-5 0 0" material="color: #ffdbac; metalness: 0.1; roughness: 0.9"></a-cylinder>
-            <a-cylinder id="finger-right-4" position="0.06 0.02 0.08" radius="0.015" height="0.11" rotation="-15 0 0" material="color: #ffdbac; metalness: 0.1; roughness: 0.9"></a-cylinder>
-            <!-- Thumb -->
-            <a-cylinder id="thumb-right" position="-0.08 0 0.02" radius="0.018" height="0.1" rotation="0 0 -45" material="color: #ffdbac; metalness: 0.1; roughness: 0.9"></a-cylinder>
-            <!-- Glow effect -->
-            <a-sphere position="0 0 0" radius="0.12" material="color: #0000ff; transparent: true; opacity: 0.3; shader: flat"></a-sphere>
-        </a-entity>
-        
-        <!-- Lighting -->
-        <a-light type="ambient" color="#404040" intensity="0.4"></a-light>
-        <a-light type="directional" position="2 4 2" color="#ffffff" intensity="0.8"></a-light>
-        
-        <!-- Sky (transparent for AR effect) -->
-        <a-sky color="#000000" opacity="0"></a-sky>
-    </a-scene>
+    <!-- Model Viewer per il cubo rosso -->
+    <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+    <model-viewer
+      id="red-cube-viewer"
+      src="Cube.glb"
+      ar
+      ar-modes="scene-viewer quick-look webxr"
+      camera-controls
+      auto-rotate
+      style="width: 100vw; height: 100vh; background: #000;"
+      alt="Cubo rosso 3D in AR"
+      exposure="1.2"
+      shadow-intensity="1"
+      camera-orbit="45deg 75deg 2.5m"
+      field-of-view="45deg"
+      environment-image="neutral">
+    </model-viewer>
     
     <!-- MediaPipe Hands con fallback -->
     <script>
@@ -957,6 +891,15 @@
                 return '';
             }
         });
+    </script>
+    
+    <script>
+    function activateAR() {
+      const modelViewer = document.getElementById('red-cube-viewer');
+      if (modelViewer && modelViewer.activateAR) {
+        modelViewer.activateAR();
+      }
+    }
     </script>
 </body>
 </html>
