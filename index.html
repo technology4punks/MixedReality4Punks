@@ -708,7 +708,6 @@
                     } catch (error) {
                         console.error('❌ Errore attivazione AR:', error);
                         document.getElementById('status').textContent = 'Errore AR: ' + error.message;
-                        
                         // Ripristina stato precedente
                         this.isARMode = false;
                         if (arButton) {
