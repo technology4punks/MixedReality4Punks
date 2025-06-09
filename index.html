@@ -59,7 +59,7 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            z-index: -1;
+            z-index: 0 !important;
         }
         
         #controls {
@@ -122,6 +122,7 @@
         a-scene {
             height: 100vh;
             width: 100vw;
+            z-index: 1 !important;
         }
         
         .hidden {
@@ -670,6 +671,10 @@
                         console.log('⚙️ Configurazione scena AR...');
                         scene.setAttribute('arjs', 'sourceType: webcam; debugUIEnabled: false;');
                         scene.setAttribute('vr-mode-ui', 'enabled: false');
+                        scene.setAttribute('background', 'color: transparent');
+                        if (scene.renderer && scene.renderer.setClearColor) {
+                            scene.renderer.setClearColor(0x000000, 0);
+                        }
                         console.log('✅ Scena AR configurata');
                     }
                     
