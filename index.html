@@ -901,5 +901,39 @@
       }
     }
     </script>
+    
+    <!-- --- Integrazione hand tracking con model-viewer --- -->
+    <script>
+    let modelViewer = document.getElementById('red-cube-viewer');
+    let lastPinch = null;
+    let scale = 1;
+
+    function onHandResults(results) {
+        const handsCount = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
+        document.getElementById('hands-count').textContent = handsCount;
+        if (handsCount > 0) {
+            const landmarks = results.multiHandLandmarks[0];
+            // Rotazione: usa la posizione X e Y della mano
+            const handCenter = landmarks[9];
+            const rotY = (handCenter.x - 0.5) * 180; // da -90 a +90 gradi
+            const rotX = (handCenter.y - 0.5) * 90;  // da -45 a +45 gradi
+            modelViewer.cameraOrbit = `${rotY}deg ${rotX}deg 2.5m`;
+            // Pinch per scalare
+            const thumb = landmarks[4];
+            const index = landmarks[8];
+            const pinchDist = Math.sqrt(Math.pow(thumb.x - index.x, 2) + Math.pow(thumb.y - index.y, 2));
+            if (lastPinch !== null) {
+                if (pinchDist < 0.04 && lastPinch > 0.04) {
+                    scale = Math.max(0.5, scale - 0.1);
+                } else if (pinchDist > 0.08 && lastPinch < 0.08) {
+                    scale = Math.min(2, scale + 0.1);
+                }
+                modelViewer.style.transform = `scale(${scale})`;
+            }
+            lastPinch = pinchDist;
+        }
+    }
+    // Assicurati che questa funzione venga chiamata da MediaPipe Hands (onResults)
+    </script>
 </body>
 </html>
